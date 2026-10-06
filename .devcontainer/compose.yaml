@@ -1,0 +1,193 @@
+# Dev environment: the `dev` container plus local infrastructure, PostgreSQL
+# (app + Langfuse databases) and a self-hosted Langfuse v4 stack.
+#
+# Secrets for this environment live in `.devcontainer/.env`, which Compose loads
+# automatically from this folder (template: `.devcontainer/.env.example`; the
+# dev container generates it on first start). The application's own settings
+# live in the root `.env`, never here.
+#
+# Langfuse v4 needs ClickHouse, Valkey (Redis-compatible) and S3-compatible
+# blob storage (MinIO) in addition to Postgres. Based on
+# https://github.com/langfuse/langfuse/blob/main/docker-compose.yml
+#
+# Image versions are pinned exactly; Dependabot (.github/dependabot.yml) opens
+# PRs to bump them. Keep langfuse-web and langfuse-worker on the same version.
+
+x-langfuse-env: &langfuse-env
+  NEXTAUTH_URL: http://localhost:3000
+  DATABASE_URL: postgresql://langfuse:${LANGFUSE_DB_PASSWORD:?}@postgres:5432/langfuse
+  SALT: ${LANGFUSE_SALT:?}
+  ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?}
+  TELEMETRY_ENABLED: "false"
+  CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+  CLICKHOUSE_URL: http://clickhouse:8123
+  CLICKHOUSE_USER: clickhouse
+  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?}
+  CLICKHOUSE_CLUSTER_ENABLED: "false"
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?}
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
+  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?}
+  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
+  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+  REDIS_HOST: valkey
+  REDIS_PORT: "6379"
+  REDIS_AUTH: ${VALKEY_PASSWORD:?}
+
+x-langfuse-depends-on: &langfuse-depends-on
+  postgres:
+    condition: service_healthy
+  clickhouse:
+    condition: service_healthy
+  valkey:
+    condition: service_healthy
+  minio:
+    condition: service_healthy
+
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TZ: ${TZ:-America/Sao_Paulo}
+    command: sleep infinity
+    volumes:
+      - ..:/workspaces/fornada:cached
+      # Keep the container's virtualenv off the host checkout.
+      - venv:/workspaces/fornada/.venv
+      - uv_cache:/home/vscode/.cache/uv
+      - claude_config:/home/vscode/.claude
+      - gh_config:/home/vscode/.config/gh
+      - command_history:/commandhistory
+    environment:
+      # Only what the agent needs. Langfuse and infra secrets stay out of here.
+      DATABASE_URI: postgresql://fornada:${FORNADA_DB_PASSWORD:?}@postgres:5432/fornada
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    # A major bump (18 -> 19) needs a data migration (pg_upgrade or dump/restore),
+    # not just a new tag. Same for Langfuse majors: read their upgrade guide first.
+    image: docker.io/postgres:18.6-trixie
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      FORNADA_DB_PASSWORD: ${FORNADA_DB_PASSWORD:?}
+      LANGFUSE_DB_PASSWORD: ${LANGFUSE_DB_PASSWORD:?}
+      # Langfuse requires UTC.
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      # Postgres 18+ images keep data under a versioned subdirectory of this path.
+      - postgres_data:/var/lib/postgresql
+      - ./postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  langfuse-web:
+    image: docker.langfuse.com/langfuse/langfuse:4.53.0
+    restart: unless-stopped
+    depends_on: *langfuse-depends-on
+    ports:
+      - 127.0.0.1:3000:3000
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:?}
+      # Presigned media URLs are opened by the browser on the host.
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://localhost:9090
+      LANGFUSE_S3_MEDIA_UPLOAD_INTERNAL_ENDPOINT: http://minio:9000
+      # Headless initialization: org, project, API keys and an admin user.
+      LANGFUSE_INIT_ORG_ID: fornada
+      LANGFUSE_INIT_ORG_NAME: Fornada
+      LANGFUSE_INIT_PROJECT_ID: fornada
+      LANGFUSE_INIT_PROJECT_NAME: Fornada
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:?}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:?}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_ADMIN_EMAIL:?}
+      LANGFUSE_INIT_USER_NAME: Admin
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_ADMIN_PASSWORD:?}
+
+  langfuse-worker:
+    image: docker.langfuse.com/langfuse/langfuse-worker:4.53.0
+    restart: unless-stopped
+    depends_on: *langfuse-depends-on
+    environment: *langfuse-env
+
+  clickhouse:
+    # Latest LTS. Langfuse v4 requires ClickHouse >= 25.12.
+    image: docker.io/clickhouse/clickhouse-server:26.8.18.2
+    restart: unless-stopped
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?}
+      TZ: UTC
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  valkey:
+    # Redis-compatible; Langfuse supports Valkey >= 8.
+    image: docker.io/valkey/valkey:9.1.2-alpine
+    restart: unless-stopped
+    # Queue jobs must never be evicted.
+    command: valkey-server --requirepass ${VALKEY_PASSWORD:?} --maxmemory-policy noeviction
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "-a", "${VALKEY_PASSWORD:?}", "--no-auth-warning", "ping"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+
+  minio:
+    # Chainguard's free tier only publishes `latest`, so it is pinned by digest.
+    image: cgr.dev/chainguard/minio:latest@sha256:a05a4497e8dce3cb7a7a1bf1872ba5d30ea988f1e8c22c9e0920503761c4b5f1
+    restart: unless-stopped
+    entrypoint: sh
+    # Create the `langfuse` bucket before starting the server.
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
+    ports:
+      - 127.0.0.1:9090:9000
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 1s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  clickhouse_data:
+  clickhouse_logs:
+  valkey_data:
+  minio_data:
+  venv:
+  uv_cache:
+  claude_config:
+  gh_config:
+  command_history:

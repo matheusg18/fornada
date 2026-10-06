@@ -41,4 +41,12 @@ The bot talks to customers in Brazilian Portuguese. Its tools are `search_catalo
 
 ## Development
 
+Requirements: Docker, VS Code with the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension, and `openssl` on the host.
+
+1. Open the repo in VS Code and run **Dev Containers: Reopen in Container**.
+2. On first start, `.devcontainer/.env` is generated with random secrets, and PostgreSQL and Langfuse start alongside the workspace.
+3. Langfuse is at http://localhost:3000. Log in with `LANGFUSE_ADMIN_EMAIL` and `LANGFUSE_ADMIN_PASSWORD` from `.devcontainer/.env`.
+
+Langfuse and its dependencies (ClickHouse, Valkey, MinIO) need a few GB of free RAM.
+
 Work is spec-driven with [OpenSpec](https://github.com/Fission-AI/OpenSpec). The full project context, the challenge rules and the AI agent tooling are documented in [AGENTS.md](AGENTS.md).

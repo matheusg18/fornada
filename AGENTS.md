@@ -131,6 +131,29 @@ Distrust simulator numbers: an agent that scores 95% against self-written person
 - **Small steps.** Before each step, announce it and wait for the maintainer's approval. Make one commit per step.
 - **Commits.** Use Conventional Commits prefixes (`feat:`, `fix:`, `chore:`, `docs:`…) and write the message in English. Older commits in Portuguese stay as they are; never rewrite history.
 - **Language.** Everything in the repo is in English: code, identifiers, comments, docs, OpenSpec artifacts and commit messages. The only exception is text the bot shows to customers (prompts, replies, seed data, test conversations), which is in Brazilian Portuguese. The maintainer usually talks to agents in Portuguese; answer them in Portuguese, but write repo content in English.
+- **Latest versions.** Before adding a dependency, image or tool, check its latest version and current docs. Install through the tool (`uv add`, `npm install`, official install scripts) so it resolves the latest release; do not hand-write versions into `pyproject.toml` or `package.json`. Container images (Dockerfile, compose) are the exception: pin them to the exact latest version (or a digest when the registry only publishes `latest`), so Dependabot (`.github/dependabot.yml`) can open PRs to bump them. Dev container features are locked in `devcontainer-lock.json`.
+
+## Dev environment
+
+Development happens inside the dev container (`.devcontainer/`). It is the sandbox for agents: Claude Code runs there in `bypassPermissions` mode (set by `/etc/claude-code/managed-settings.json` in the image, so it applies only inside the container), as the non-root `vscode` user. There is no egress firewall. Do not add a Docker socket or host credentials to the container, because that would break the isolation.
+
+- **Services** (`.devcontainer/compose.yaml`): `dev` (the workspace), `postgres` (PostgreSQL 18 with the `fornada` and `langfuse` databases) and Langfuse v4 (`langfuse-web`, `langfuse-worker`, plus its dependencies `clickhouse`, `valkey` and `minio`). Langfuse UI: http://localhost:3000. Inside the container, use service names (`postgres:5432`, `langfuse-web:3000`).
+- **Toolchain:** uv manages Python (latest stable); Node LTS, `gh`, `psql` and Chrome (for the Playwright MCP) are preinstalled. The virtualenv lives in a volume at `/workspaces/fornada/.venv`, separate from the host.
+- **Persisted volumes:** Claude Code config and login (`CLAUDE_CONFIG_DIR=/home/vscode/.claude`), `gh` login, uv cache, shell history, and data for every service.
+- **Git over SSH:** VS Code forwards the host's SSH agent. The private key never enters the container.
+
+### Environment files
+
+Keep these two apart. They hold different things for different consumers.
+
+| File | What goes in it | Who reads it |
+|---|---|---|
+| `.devcontainer/.env` | Dev environment secrets: infra passwords (Postgres, Langfuse, ClickHouse, Valkey, MinIO), the agent's `DATABASE_URI`, and any keys for agent tooling | Docker Compose, when it starts the dev environment |
+| `.env` (repo root) | Application settings: what the Fornada app needs at runtime (model API keys, its database URL, OTel endpoint…) | The application |
+
+- Both are gitignored, and each one has a committed `.env.example` template next to it.
+- `.devcontainer/.env` is generated with random secrets on the first start (`.devcontainer/init-env.sh`, run on the host).
+- The `dev` service only receives the variables the agent needs (today only `DATABASE_URI`). Infra secrets stay in the infra services.
 
 ## Agent tooling
 
@@ -150,12 +173,12 @@ Everything is installed at project scope and versioned:
 | Langfuse | `langfuse-docs` | MCP (HTTP) | `https://langfuse.com/api/mcp` | checking Langfuse docs |
 | PostgreSQL | `postgres-best-practices` | plugin | marketplace `supabase/agent-skills` | schema design, migrations, indexes, query tuning |
 | PostgreSQL | `postgres` | MCP (stdio) | `uvx postgres-mcp --access-mode=restricted` | inspecting the database, EXPLAIN plans, health checks |
-| Docs (general) | `context7` | plugin (MCP) | `claude-plugins-official` | up-to-date docs for any other library |
+| Docs (general) | `context7` | plugin (MCP) | `claude-plugins-official` | up-to-date docs for any other library (OAuth: log in once via `/mcp`) |
 | Browser / E2E | `playwright` | plugin (MCP) | `claude-plugins-official` | driving a browser, end-to-end tests |
 
 Notes:
 
-- The `postgres` MCP reads `DATABASE_URI` from the environment. It only works once a database exists. Never commit credentials; put them in `.env`, which is gitignored.
+- The `postgres` MCP reads `DATABASE_URI` from the environment. The dev container sets it from `.devcontainer/.env` (role `fornada`, database `fornada`). Never commit credentials.
 - The `postgres-best-practices` plugin bundles a Supabase docs MCP. It is disabled via `disabledMcpServers` in `.claude/settings.json` because this project does not use Supabase.
 
 ### Installing new agent resources
