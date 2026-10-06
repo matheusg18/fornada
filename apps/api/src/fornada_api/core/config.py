@@ -89,7 +89,8 @@ class Settings(BaseSettings):
                 # `llm.provider` -> `LLM__PROVIDER`
                 where = "__".join(str(part) for part in err["loc"]).upper()
                 lines.append(f"{where}: {err['msg']}" if where else err["msg"])
-            raise ConfigError("Invalid settings:\n" + "\n".join(lines)) from exc
+            # `from None`: the original error echoes raw input, API keys included.
+            raise ConfigError("Invalid settings:\n" + "\n".join(lines)) from None
 
 
 @cache

@@ -1,3 +1,4 @@
+import traceback
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -116,6 +117,18 @@ def test_api_key_is_masked(with_key: None) -> None:
     settings = load()
     for text in (str(settings), repr(settings), str(settings.model_dump())):
         assert "sk-ant-test" not in text
+
+
+def test_config_error_does_not_leak_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Active provider has no key; the inactive one does. The printed
+    # traceback must not carry the raw input that pydantic echoes back.
+    monkeypatch.setenv("LLM__PROVIDER", "openai")
+    monkeypatch.setenv("LLM__ANTHROPIC__API_KEY", "sk-SEC")
+    with pytest.raises(ConfigError) as exc_info:
+        load()
+    printed = "".join(traceback.format_exception(exc_info.value))
+    assert "LLM__OPENAI__API_KEY" in printed
+    assert "sk-SEC" not in printed
 
 
 # --- time zone and log level -------------------------------------------------

@@ -38,7 +38,7 @@ A root `Settings(BaseSettings)` with three nested `BaseModel` fields: `llm: LlmS
 Model defaults: Anthropic `claude-haiku-4-5` (Haiku class, as AGENTS.md asks for the agent) and OpenAI `gpt-5-mini` (the maintainer's choice; the equivalent cheap tier).
 
 ### Validation errors name environment variables
-`Settings.__init__` catches pydantic's `ValidationError` and re-raises `ConfigError` with one line per problem, the location rendered as the environment variable (`llm.provider` becomes `LLM__PROVIDER`). This is what the specs mean by "an error that names `LLM__PROVIDER`". A missing `llm` namespace falls back to its defaults, so the missing-key error comes from the validator with the full variable name.
+`Settings.__init__` catches pydantic's `ValidationError` and re-raises `ConfigError` with one line per problem, the location rendered as the environment variable (`llm.provider` becomes `LLM__PROVIDER`). This is what the specs mean by "an error that names `LLM__PROVIDER`". It is raised `from None`: pydantic's original error echoes the raw input, which holds API keys before they become `SecretStr`. A missing `llm` namespace falls back to its defaults, so the missing-key error comes from the validator with the full variable name.
 
 Nested env values arrive as partial dicts that replace field defaults, so each provider has its own model class (`AnthropicSettings`, `OpenAISettings`) with the default `model` on the field.
 
