@@ -5,6 +5,41 @@ context: |
   All artifacts must be written in en.
   Keep OpenSpec structural headings and SHALL/MUST keywords in English.
 
+  Project: Fornada, a chat agent that takes cake orders for a fictional bakery.
+  End users speak Brazilian Portuguese. The agent is deliberately simple; the
+  real deliverable is the quality apparatus around it (telemetry, error analysis,
+  evals in CI, red team, guardrails, governance), proven with before/after
+  numbers against a naive `v0`. Full context lives in AGENTS.md.
+
+  Frozen scope (do not add tools or features): buscar_catalogo,
+  checar_capacidade(data), calcular_orcamento, criar_pedido,
+  consultar_pedido(id, tel), cancelar_pedido, aplicar_cupom,
+  enviar_mensagem(tel, texto), escalar_humano. Minimal chat UI, no polish.
+
+  Stack: Python (uv), LangGraph, FastAPI, PostgreSQL in Docker; plain
+  OpenTelemetry SDK in app code (no Langfuse or Elastic SDK) -> EDOT Collector
+  -> Langfuse (LLM traces) and Elasticsearch/Kibana (traces, logs, metrics);
+  DeepEval + pytest with JSONL datasets; GitHub Actions gate; promptfoo redteam;
+  deterministic guardrails as LangGraph nodes; Model Armor vs Prompt Guard 2 86M;
+  Presidio (pt-BR) for PII.
+
+  Phases: 1 naive foundation (tag v0), 2 instrumentation, 3 error analysis,
+  4 evals + CI gate, 5 red team, 6 guardrails + online evals, 7 governance.
+
+  Challenge rules: v0 has no defenses; no eval without an observed failure;
+  no fix without a failing reproduction case first; critical scenarios gate on
+  pass^3; LLM judges only after calibration (TPR/TNR > 85%); measure ASR before
+  any guardrail; every guardrail reports p95 latency and false-positive rate;
+  cost per conversation is a first-class metric (about US$ 20/month budget);
+  code policies over prompt instructions for security.
+
+rules:
+  proposal:
+    - State which challenge phase (1-7) the change belongs to
+    - Confirm the change stays within the frozen scope, or say explicitly why not
+  design:
+    - For guardrails and evals, state how the effect will be measured (ASR, false positives, p95, cost)
+
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.
 # Example:
