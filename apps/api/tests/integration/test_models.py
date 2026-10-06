@@ -87,5 +87,5 @@ async def test_order_customer(session: AsyncSession) -> None:
 async def test_lazy_load_raises(session: AsyncSession) -> None:
     order = await session.scalar(select(Order).limit(1))
     assert order is not None
-    with pytest.raises(Exception, match="lazy='raise'"):
+    with pytest.raises(InvalidRequestError, match="lazy='raise'"):
         order.customer  # noqa: B018
