@@ -1,7 +1,8 @@
 {
   "enabledPlugins": {
     "langchain-skills@langchain-skills": true,
-    "langfuse@claude-plugins-official": true
+    "langfuse@claude-plugins-official": true,
+    "postgres-best-practices@supabase-agent-skills": true
   },
   "extraKnownMarketplaces": {
     "langchain-skills": {
@@ -9,6 +10,15 @@
         "source": "github",
         "repo": "langchain-ai/langchain-skills"
       }
+    },
+    "supabase-agent-skills": {
+      "source": {
+        "source": "github",
+        "repo": "supabase/agent-skills"
+      }
     }
-  }
+  },
+  "disabledMcpServers": [
+    "plugin:postgres-best-practices:supabase"
+  ]
 }
