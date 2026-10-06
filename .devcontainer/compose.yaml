@@ -68,7 +68,6 @@ services:
     environment:
       # Only what the agent needs. Langfuse and infra secrets stay out of here.
       DATABASE_URI: postgresql://fornada:${FORNADA_DB_PASSWORD:?}@postgres:5432/fornada
-      CONTEXT7_API_KEY: ${CONTEXT7_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy

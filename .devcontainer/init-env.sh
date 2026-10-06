@@ -23,9 +23,6 @@ LANGFUSE_ADMIN_PASSWORD=$(hex 12)
 CLICKHOUSE_PASSWORD=$(hex 24)
 VALKEY_PASSWORD=$(hex 24)
 MINIO_ROOT_PASSWORD=$(hex 24)
-
-# Optional, fill in by hand
-CONTEXT7_API_KEY=
 EOF
 chmod 600 "$env_file"
 echo "Created .devcontainer/.env with random secrets."

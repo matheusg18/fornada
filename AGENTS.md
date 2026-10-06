@@ -148,12 +148,12 @@ Keep these two apart. They hold different things for different consumers.
 
 | File | What goes in it | Who reads it |
 |---|---|---|
-| `.devcontainer/.env` | Dev environment secrets: infra passwords (Postgres, Langfuse, ClickHouse, Valkey, MinIO), the agent's `DATABASE_URI`, tooling keys such as `CONTEXT7_API_KEY` | Docker Compose, when it starts the dev environment |
+| `.devcontainer/.env` | Dev environment secrets: infra passwords (Postgres, Langfuse, ClickHouse, Valkey, MinIO), the agent's `DATABASE_URI`, and any keys for agent tooling | Docker Compose, when it starts the dev environment |
 | `.env` (repo root) | Application settings: what the Fornada app needs at runtime (model API keys, its database URL, OTel endpoint…) | The application |
 
 - Both are gitignored, and each one has a committed `.env.example` template next to it.
 - `.devcontainer/.env` is generated with random secrets on the first start (`.devcontainer/init-env.sh`, run on the host).
-- The `dev` service only receives the variables the agent needs (`DATABASE_URI`, `CONTEXT7_API_KEY`). Infra secrets stay in the infra services.
+- The `dev` service only receives the variables the agent needs (today only `DATABASE_URI`). Infra secrets stay in the infra services.
 
 ## Agent tooling
 
@@ -173,7 +173,7 @@ Everything is installed at project scope and versioned:
 | Langfuse | `langfuse-docs` | MCP (HTTP) | `https://langfuse.com/api/mcp` | checking Langfuse docs |
 | PostgreSQL | `postgres-best-practices` | plugin | marketplace `supabase/agent-skills` | schema design, migrations, indexes, query tuning |
 | PostgreSQL | `postgres` | MCP (stdio) | `uvx postgres-mcp --access-mode=restricted` | inspecting the database, EXPLAIN plans, health checks |
-| Docs (general) | `context7` | plugin (MCP) | `claude-plugins-official` | up-to-date docs for any other library |
+| Docs (general) | `context7` | plugin (MCP) | `claude-plugins-official` | up-to-date docs for any other library (OAuth: log in once via `/mcp`) |
 | Browser / E2E | `playwright` | plugin (MCP) | `claude-plugins-official` | driving a browser, end-to-end tests |
 
 Notes:
