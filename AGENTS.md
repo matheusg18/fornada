@@ -154,6 +154,8 @@ Rules for core work, whatever output style is active:
 
 For core sessions, the maintainer can switch to the project's **Fornada Core** output style (`.claude/output-styles/fornada-core.md`) with `/output-style`. For periphery, use the default style.
 
+The maintainer keeps short learning notes per phase in `docs/learning/`. Read `docs/learning/AGENTS.md` before writing there, and write there only when asked.
+
 ## Repository layout
 
 The repo is a **uv workspace** (monorepo). Both apps are Python, since Chainlit ships its own chat UI.
