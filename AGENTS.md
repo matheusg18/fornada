@@ -181,6 +181,7 @@ Development happens inside the dev container (`.devcontainer/`). It is the sandb
 - **Services** (`.devcontainer/compose.yaml`): `dev` (the workspace), `postgres` (PostgreSQL 18 with the `fornada` and `langfuse` databases) and Langfuse v4 (`langfuse-web`, `langfuse-worker`, plus its dependencies `clickhouse`, `valkey` and `minio`). Langfuse UI: http://localhost:3000. Inside the container, use service names (`postgres:5432`, `langfuse-web:3000`).
 - **Toolchain:** uv manages Python (the version in `.python-version`); Node LTS, `gh`, `psql` and Chrome (for the Playwright MCP) are preinstalled. The virtualenv lives in a volume at `/workspaces/fornada/.venv`, separate from the host.
 - **Persisted volumes:** Claude Code config and login (`CLAUDE_CONFIG_DIR=/home/vscode/.claude`), `gh` login, uv cache, shell history, and data for every service.
+- **Database seed:** `.devcontainer/db/schema.sql` and `.devcontainer/db/seed.sql` load into `fornada` on the first start of an empty Postgres volume only. To reset a running database: `psql "$DATABASE_URI" -v ON_ERROR_STOP=1 -f .devcontainer/db/schema.sql -f .devcontainer/db/seed.sql` (see `.devcontainer/db/README.md`).
 - **Git over SSH:** VS Code forwards the host's SSH agent. The private key never enters the container.
 
 ### Environment files
