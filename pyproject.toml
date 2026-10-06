@@ -5,3 +5,6 @@ members = ["apps/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["apps/api/tests"]
+markers = [
+    "integration: needs the dev container's seeded Postgres (DATABASE_URI)",
+]
