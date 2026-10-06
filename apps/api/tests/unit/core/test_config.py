@@ -5,7 +5,7 @@ import pytest
 
 from fornada_api.core.config import ConfigError, Settings
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
+REPO_ROOT = Path(__file__).resolve().parents[5]
 
 
 @pytest.fixture(autouse=True)

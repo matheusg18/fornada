@@ -22,7 +22,7 @@ This is periphery work in phase 1: it adds no defense and has no ASR, false-posi
 ## Decisions
 
 ### Package layout: `fornada_api/core/`
-`core/__init__.py`, `core/config.py`, `core/logging.py`. Inside the package, `import logging` in `core/logging.py` still resolves to the standard library (absolute imports), so the module name mirrors what it configures. Tests go in `apps/api/tests/core/`.
+`core/__init__.py`, `core/config.py`, `core/logging.py`. Inside the package, `import logging` in `core/logging.py` still resolves to the standard library (absolute imports), so the module name mirrors what it configures. Tests go in `apps/api/tests/unit/core/`.
 
 ### `pydantic-settings` with nested models and `__` delimiter
 A root `Settings(BaseSettings)` with three nested `BaseModel` fields: `llm: LlmSettings`, `app: AppSettings`, `log: LogSettings`. `LlmSettings` has `provider` plus `anthropic: ProviderSettings` and `openai: ProviderSettings`. `model_config` sets `env_nested_delimiter="__"`, `env_file=".env"`, `env_file_encoding="utf-8"`, `case_sensitive=False` and `extra="ignore"`.
