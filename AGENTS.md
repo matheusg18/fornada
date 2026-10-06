@@ -133,6 +133,27 @@ Distrust simulator numbers: an agent that scores 95% against self-written person
 - **Language.** Everything in the repo is in English: code, identifiers, comments, docs, OpenSpec artifacts and commit messages. The only exception is text the bot shows to customers (prompts, replies, seed data, test conversations), which is in Brazilian Portuguese. The maintainer usually talks to agents in Portuguese; answer them in Portuguese, but write repo content in English.
 - **Latest versions.** Before adding a dependency, image or tool, check its latest version and current docs. Install through the tool (`uv add`, `npm install`, official install scripts) so it resolves the latest release; do not hand-write versions into `pyproject.toml` or `package.json`. Container images (Dockerfile, compose) are the exception: pin them to the exact latest version (or a digest when the registry only publishes `latest`), so Dependabot (`.github/dependabot.yml`) can open PRs to bump them. Dev container features are locked in `devcontainer-lock.json`.
 
+## Core and periphery
+
+This is also a learning project. **Core** is what the maintainer wants to learn: they write or decide it. **Periphery** is plumbing: agents do it on their own.
+
+| Phase | Core (maintainer writes or decides) | Periphery (agent does it) |
+|---|---|---|
+| 1 Foundation | Graph design: nodes, state, where decisions live | FastAPI, seed with Faker, Docker Compose, UI |
+| 2 Instrumentation | `TracerProvider`, sampler, which spans and attributes exist, the pipelines in the Collector config | Package installs, Elastic and Langfuse compose, credentials |
+| 3 Error analysis | All of it. Reading traces and annotating failures is human work by definition | Persona simulator, script that exports traces for annotation |
+| 4 Evals | Deterministic asserts, judge criteria, choice of critical cases, pass^3 calculation | GitHub Actions workflow, fixtures, report formatting |
+| 5 Red team | Domain-specific attacks, reading the ones that worked | promptfoo config, HTTP provider, report generation |
+| 6 Guardrails | Authorization policies in the tools, Presidio recognizers for phone and CPF, classifier thresholds | Loading Prompt Guard 2, Model Armor client, comparison script |
+| 7 Governance | System card, risk register and LGPD map, written by the maintainer | Audit log table, templates |
+
+Rules for core work, whatever output style is active:
+
+- **No subagents for core work.** Do it in the main conversation, leaving `TODO(human)` markers on the decisions in the table above.
+- **Errors in core code get a question, not a fix.** When the maintainer pastes an error from core code, ask a question that helps them find the cause. Fix it only if they explicitly ask.
+
+For core sessions, the maintainer can switch to the project's **Fornada Core** output style (`.claude/output-styles/fornada-core.md`) with `/output-style`. For periphery, use the default style.
+
 ## Repository layout
 
 The repo is a **uv workspace** (monorepo). Both apps are Python, since Chainlit ships its own chat UI.
@@ -180,6 +201,7 @@ Everything is installed at project scope and versioned:
 - `.claude/settings.json` declares the marketplaces and enabled plugins.
 - `.mcp.json` declares the MCP servers.
 - `.claude/skills/` holds the skills copied into the repo.
+- `.claude/output-styles/` holds the project's output styles (`Fornada Core`, for core learning sessions).
 
 | Area | Resource | Type | Source | Use it when… |
 |---|---|---|---|---|
