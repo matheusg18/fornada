@@ -2,7 +2,9 @@
   "enabledPlugins": {
     "langchain-skills@langchain-skills": true,
     "langfuse@claude-plugins-official": true,
-    "postgres-best-practices@supabase-agent-skills": true
+    "postgres-best-practices@supabase-agent-skills": true,
+    "context7@claude-plugins-official": true,
+    "playwright@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "langchain-skills": {
