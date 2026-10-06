@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Node (ferramentas de agentes, ex.: OpenSpec via npx)
+node_modules/
+
+# Ambiente e segredos
+.env
+.env.*
+!.env.example
+
+# Claude Code: configurações pessoais não versionadas
+.claude/settings.local.json
+
+# Editor / SO
+.vscode/
+.idea/
+.DS_Store
