@@ -3,6 +3,10 @@
     "docs-langchain": {
       "type": "http",
       "url": "https://docs.langchain.com/mcp"
+    },
+    "langfuse-docs": {
+      "type": "http",
+      "url": "https://langfuse.com/api/mcp"
     }
   }
 }
