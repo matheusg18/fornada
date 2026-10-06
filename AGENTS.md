@@ -179,7 +179,7 @@ apps/
 Development happens inside the dev container (`.devcontainer/`). It is the sandbox for agents: Claude Code runs there in `bypassPermissions` mode (set by `/etc/claude-code/managed-settings.json` in the image, so it applies only inside the container), as the non-root `vscode` user. There is no egress firewall. Do not add a Docker socket or host credentials to the container, because that would break the isolation.
 
 - **Services** (`.devcontainer/compose.yaml`): `dev` (the workspace), `postgres` (PostgreSQL 18 with the `fornada` and `langfuse` databases) and Langfuse v4 (`langfuse-web`, `langfuse-worker`, plus its dependencies `clickhouse`, `valkey` and `minio`). Langfuse UI: http://localhost:3000. Inside the container, use service names (`postgres:5432`, `langfuse-web:3000`).
-- **Toolchain:** uv manages Python (latest stable); Node LTS, `gh`, `psql` and Chrome (for the Playwright MCP) are preinstalled. The virtualenv lives in a volume at `/workspaces/fornada/.venv`, separate from the host.
+- **Toolchain:** uv manages Python (the version in `.python-version`); Node LTS, `gh`, `psql` and Chrome (for the Playwright MCP) are preinstalled. The virtualenv lives in a volume at `/workspaces/fornada/.venv`, separate from the host.
 - **Persisted volumes:** Claude Code config and login (`CLAUDE_CONFIG_DIR=/home/vscode/.claude`), `gh` login, uv cache, shell history, and data for every service.
 - **Git over SSH:** VS Code forwards the host's SSH agent. The private key never enters the container.
 
@@ -189,12 +189,12 @@ Keep these two apart. They hold different things for different consumers.
 
 | File | What goes in it | Who reads it |
 |---|---|---|
-| `.devcontainer/.env` | Dev environment secrets: infra passwords (Postgres, Langfuse, ClickHouse, Valkey, MinIO), the agent's `DATABASE_URI`, and any keys for agent tooling | Docker Compose, when it starts the dev environment |
+| `.devcontainer/.env` | Dev environment secrets: infra passwords (Postgres, Langfuse, ClickHouse, Valkey, MinIO) and any keys for agent tooling | Docker Compose, when it starts the dev environment |
 | `.env` (repo root) | Application settings: what the Fornada app needs at runtime (model API keys, its database URL, OTel endpoint…) | The application |
 
-- Both are gitignored, and each one has a committed `.env.example` template next to it.
+- Both are gitignored, and each one gets a committed `.env.example` template next to it. The root template arrives with the app's first setting.
 - `.devcontainer/.env` is generated with random secrets on the first start (`.devcontainer/init-env.sh`, run on the host).
-- The `dev` service only receives the variables the agent needs (today only `DATABASE_URI`). Infra secrets stay in the infra services.
+- The `dev` service only receives the variables the agent needs. Today that is only `DATABASE_URI`, which `compose.yaml` builds from `FORNADA_DB_PASSWORD`. Infra secrets stay in the infra services.
 
 ## Agent tooling
 
@@ -214,13 +214,14 @@ Everything is installed at project scope and versioned:
 | Langfuse | `langfuse` | plugin | `claude-plugins-official` | Langfuse concepts, sessions, annotation, datasets, prompt management (app code emits plain OTel, never the Langfuse SDK) |
 | Langfuse | `langfuse-docs` | MCP (HTTP) | `https://langfuse.com/api/mcp` | checking Langfuse docs |
 | PostgreSQL | `postgres-best-practices` | plugin | marketplace `supabase/agent-skills` | schema design, migrations, indexes, query tuning |
-| PostgreSQL | `postgres` | MCP (stdio) | `uvx postgres-mcp --access-mode=restricted` | inspecting the database, EXPLAIN plans, health checks |
+| PostgreSQL | `postgres` | MCP (stdio) | `uvx --with "mcp<2" postgres-mcp --access-mode=restricted` | inspecting the database, EXPLAIN plans, health checks |
 | Docs (general) | `context7` | plugin (MCP) | `claude-plugins-official` | up-to-date docs for any other library (OAuth: log in once via `/mcp`) |
 | Browser / E2E | `playwright` | plugin (MCP) | `claude-plugins-official` | driving a browser, end-to-end tests |
 
 Notes:
 
-- The `postgres` MCP reads `DATABASE_URI` from the environment. The dev container sets it from `.devcontainer/.env` (role `fornada`, database `fornada`). Never commit credentials.
+- The `postgres` MCP reads `DATABASE_URI` from the environment, so it only connects inside the dev container. `compose.yaml` builds the URI from `FORNADA_DB_PASSWORD` in `.devcontainer/.env` (role `fornada`, database `fornada`). Never commit credentials.
+- `postgres-mcp` 0.3.0 does not cap its `mcp` dependency and breaks with `mcp` 2.x (upstream issue crystaldba/postgres-mcp#208), so `.mcp.json` runs it with `--with "mcp<2"`. Drop the cap once upstream supports `mcp` 2.x.
 - The `postgres-best-practices` plugin bundles a Supabase docs MCP. It is disabled via `disabledMcpServers` in `.claude/settings.json` because this project does not use Supabase.
 
 ### Installing new agent resources

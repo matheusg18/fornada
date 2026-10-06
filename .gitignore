@@ -11,15 +11,15 @@ htmlcov/
 dist/
 build/
 
-# Node (ferramentas de agentes, ex.: OpenSpec via npx)
+# Node (agent tooling, e.g. OpenSpec via npx)
 node_modules/
 
-# Ambiente e segredos
+# Environment and secrets
 .env
 .env.*
 !.env.example
 
-# Claude Code: configurações pessoais não versionadas
+# Claude Code: personal settings, not versioned
 .claude/settings.local.json
 
 # Editor / SO
