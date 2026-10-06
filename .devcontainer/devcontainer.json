@@ -32,16 +32,35 @@
 
   "customizations": {
     "vscode": {
+      // UI-side extensions (themes, icons, language packs) come from the host.
+      // No Docker extensions: the container has no Docker socket on purpose.
       "extensions": [
         "anthropic.claude-code",
         "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.debugpy",
         "charliermarsh.ruff",
+        "ms-toolsai.jupyter",
+        "ms-toolsai.datawrangler",
+        "ms-ossdata.vscode-pgsql",
+        "eamodio.gitlens",
+        "github.vscode-pull-request-github",
+        "github.vscode-github-actions",
+        "yzhang.markdown-all-in-one",
+        "mechatroner.rainbow-csv",
         "tamasfe.even-better-toml",
         "redhat.vscode-yaml"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/workspaces/fornada/.venv/bin/python",
-        "terminal.integrated.defaultProfile.linux": "zsh"
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+          }
+        }
       }
     }
   }
