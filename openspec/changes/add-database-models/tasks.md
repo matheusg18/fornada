@@ -26,10 +26,10 @@
 
 ## 5. FastAPI app (`api-service`)
 
-- [ ] 5.1 Create `fornada_api/main.py` with the lifespan (settings, logging, `get_engine()` on startup, `await get_engine().dispose()` on exit) and `fornada_api/health.py` with `GET /health/db` (count + `select(Model).limit(1)` per mapper, 503 `unavailable` on `SQLAlchemyError`/`OSError`, exception logged); include the router; verify `uv run --package fornada-api python -c "from fornada_api.main import app"` works
-- [ ] 5.2 Add `[tool.fastapi] entrypoint` to `apps/api/pyproject.toml`, point the `fornada-api` script at `uvicorn.run("fornada_api.main:app")`, and find the dev command that works from the repo root; verify `curl localhost:8000/health/db` returns 200 with that command running
-- [ ] 5.3 Write `tests/integration/test_health.py`: 200 with `status == "ok"`, 11 tables, `products == 12`, `neighborhoods == 8`; body contains no seeded customer name or phone; 503 `unavailable` with `DB__URL=postgresql://x:secret@127.0.0.1:1/x` (after clearing the settings and engine caches) and the body lacks `secret` and `127.0.0.1`; no `pg_stat_activity` row with `application_name = 'fornada-api'` after the `TestClient` context exits; startup without `DB__URL` raises `ConfigError` naming it; verify all pass
-- [ ] 5.4 Document running the API (dev command, `/docs`, `/health/db`) and the integration tests in `apps/api/README.md`; verify every documented command runs as written
+- [x] 5.1 Create `fornada_api/main.py` with the lifespan (settings, logging, `get_engine()` on startup, `await get_engine().dispose()` on exit) and `fornada_api/health.py` with `GET /health/db` (count + `select(Model).limit(1)` per mapper, 503 `unavailable` on `SQLAlchemyError`/`OSError`, exception logged); include the router; verify `uv run --package fornada-api python -c "from fornada_api.main import app"` works
+- [x] 5.2 Add `[tool.fastapi] entrypoint` to `apps/api/pyproject.toml`, point the `fornada-api` script at `uvicorn.run("fornada_api.main:app")`, and find the dev command that works from the repo root; verify `curl localhost:8000/health/db` returns 200 with that command running
+- [x] 5.3 Write `tests/integration/test_health.py`: 200 with `status == "ok"`, 11 tables, `products == 12`, `neighborhoods == 8`; body contains no seeded customer name or phone; 503 `unavailable` with `DB__URL=postgresql://x:secret@127.0.0.1:1/x` (after clearing the settings and engine caches) and the body lacks `secret` and `127.0.0.1`; no `pg_stat_activity` row with `application_name = 'fornada-api'` after the `TestClient` context exits; startup without `DB__URL` raises `ConfigError` naming it; verify all pass
+- [x] 5.4 Document running the API (dev command, `/docs`, `/health/db`) and the integration tests in `apps/api/README.md`; verify every documented command runs as written
 
 ## 6. Integration check
 
