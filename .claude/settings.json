@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "langchain-skills": {
+      "source": {
+        "source": "github",
+        "repo": "langchain-ai/langchain-skills"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "langchain-skills@langchain-skills": true
+  }
+}
