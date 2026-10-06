@@ -6,7 +6,7 @@ set -euo pipefail
 sudo chown vscode:vscode /workspaces/fornada/.venv
 
 # Create the virtualenv first, so the interpreter set in devcontainer.json
-# exists as early as possible, even before there is a pyproject.toml.
+# exists as early as possible, before the slower steps below.
 uv venv --allow-existing
 
 # Trust GitHub's SSH host keys, fetched over HTTPS from GitHub's API.
@@ -17,7 +17,5 @@ curl -fsSL https://api.github.com/meta \
 # Browser for the Playwright MCP, which uses the Chrome channel by default.
 sudo env "PATH=$PATH" npx -y playwright@latest install --with-deps chrome
 
-# Python dependencies, once the project has a pyproject.toml.
-if [[ -f pyproject.toml ]]; then
-  uv sync
-fi
+# Install every workspace member (apps/*) into the root .venv.
+uv sync

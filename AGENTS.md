@@ -133,6 +133,24 @@ Distrust simulator numbers: an agent that scores 95% against self-written person
 - **Language.** Everything in the repo is in English: code, identifiers, comments, docs, OpenSpec artifacts and commit messages. The only exception is text the bot shows to customers (prompts, replies, seed data, test conversations), which is in Brazilian Portuguese. The maintainer usually talks to agents in Portuguese; answer them in Portuguese, but write repo content in English.
 - **Latest versions.** Before adding a dependency, image or tool, check its latest version and current docs. Install through the tool (`uv add`, `npm install`, official install scripts) so it resolves the latest release; do not hand-write versions into `pyproject.toml` or `package.json`. Container images (Dockerfile, compose) are the exception: pin them to the exact latest version (or a digest when the registry only publishes `latest`), so Dependabot (`.github/dependabot.yml`) can open PRs to bump them. Dev container features are locked in `devcontainer-lock.json`.
 
+## Repository layout
+
+The repo is a **uv workspace** (monorepo). Both apps are Python, since Chainlit ships its own chat UI.
+
+```
+pyproject.toml      # virtual workspace root: members = ["apps/*"]
+uv.lock             # one lockfile for every app
+.python-version     # one Python version for every app
+.venv/              # one virtualenv at the root (a volume in the dev container)
+apps/
+├─ api/             # fornada-api: FastAPI + LangGraph agent (src/fornada_api)
+└─ chat/            # fornada-chat: Chainlit UI, talks to the API over HTTP (src/fornada_chat)
+```
+
+- Never create a `.venv` inside an app. Run `uv sync` at the root; it installs every member.
+- Add a dependency to one app with `uv add --package fornada-api <pkg>`, and run an app with `uv run --package fornada-api …`.
+- A new app goes under `apps/` with `uv init --package apps/<name>`; the glob picks it up.
+
 ## Dev environment
 
 Development happens inside the dev container (`.devcontainer/`). It is the sandbox for agents: Claude Code runs there in `bypassPermissions` mode (set by `/etc/claude-code/managed-settings.json` in the image, so it applies only inside the container), as the non-root `vscode` user. There is no egress firewall. Do not add a Docker socket or host credentials to the container, because that would break the isolation.
