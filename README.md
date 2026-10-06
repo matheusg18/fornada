@@ -15,7 +15,7 @@ Ordering a cake looks trivial, which is the point. The agent is easy to build an
 - **Untrusted input:** free-text messages and a "reference photo description" that lands in the context, an opening for prompt injection.
 - **Side-effecting actions:** creating and cancelling orders, applying coupons, sending messages.
 
-The bot's users speak Brazilian Portuguese, so the tools have Portuguese names: `buscar_catalogo`, `checar_capacidade`, `calcular_orcamento`, `criar_pedido`, `consultar_pedido`, `cancelar_pedido`, `aplicar_cupom`, `enviar_mensagem` and `escalar_humano`.
+The bot talks to customers in Brazilian Portuguese. Its tools are `search_catalog`, `check_capacity`, `calculate_quote`, `create_order`, `get_order`, `cancel_order`, `apply_coupon`, `send_message` and `escalate_to_human`.
 
 ## Stack
 

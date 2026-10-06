@@ -11,10 +11,10 @@ context: |
   evals in CI, red team, guardrails, governance), proven with before/after
   numbers against a naive `v0`. Full context lives in AGENTS.md.
 
-  Frozen scope (do not add tools or features): buscar_catalogo,
-  checar_capacidade(data), calcular_orcamento, criar_pedido,
-  consultar_pedido(id, tel), cancelar_pedido, aplicar_cupom,
-  enviar_mensagem(tel, texto), escalar_humano. Minimal chat UI, no polish.
+  Frozen scope (do not add tools or features): search_catalog,
+  check_capacity(date), calculate_quote, create_order,
+  get_order(order_id, phone), cancel_order, apply_coupon,
+  send_message(phone, text), escalate_to_human. Minimal chat UI, no polish.
 
   Stack: Python (uv), LangGraph, FastAPI, PostgreSQL in Docker; plain
   OpenTelemetry SDK in app code (no Langfuse or Elastic SDK) -> EDOT Collector
