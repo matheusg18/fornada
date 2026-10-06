@@ -128,7 +128,7 @@ services:
     environment: *langfuse-env
 
   clickhouse:
-    # Latest LTS. Langfuse v4 requires ClickHouse >= 25.12.
+    # Langfuse v4 requires ClickHouse >= 25.12.
     image: docker.io/clickhouse/clickhouse-server:26.9.8.3
     restart: unless-stopped
     user: "101:101"
