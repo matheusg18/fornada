@@ -33,7 +33,7 @@
 
 ## 6. Integration check
 
-- [ ] 6.1 Run the full suite from the repo root (`uv run --package fornada-api pytest`) inside the dev container, then reset the database with the command in `.devcontainer/db/README.md` and run it again; verify both runs pass and no test left rows behind
+- [x] 6.1 Run the full suite from the repo root (`uv run --package fornada-api pytest`) inside the dev container, then reset the database with the command in `.devcontainer/db/README.md` and run it again; verify both runs pass and no test left rows behind
 
 ## Workflow follow-up
 
