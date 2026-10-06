@@ -4,9 +4,11 @@ They are skipped when `DATABASE_URI` is not set (outside the dev container).
 """
 
 import os
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 
 import pytest
+from sqlalchemy import make_url
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 
 DATABASE_URI = os.environ.get("DATABASE_URI")
 
@@ -36,3 +38,19 @@ def db_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
+
+
+@pytest.fixture
+async def engine() -> AsyncIterator[AsyncEngine]:
+    """A test-owned engine, independent of the app's cached one."""
+    assert DATABASE_URI
+    url = make_url(DATABASE_URI).set(drivername="postgresql+psycopg")
+    engine = create_async_engine(url)
+    yield engine
+    await engine.dispose()
+
+
+@pytest.fixture
+async def session(engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
+    async with AsyncSession(engine) as session:
+        yield session

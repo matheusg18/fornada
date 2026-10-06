@@ -13,10 +13,10 @@
 
 ## 3. Models (`database-access`)
 
-- [ ] 3.1 Create `models/base.py` (`Base`, `type_annotation_map`) and the `OrderStatus`, `Fulfillment` and `AllergenKind` `StrEnum`s; verify `python -c "import fornada_api.models"` works
-- [ ] 3.2 Implement the catalog models (`Product`, `Allergen`, `ProductAllergen`, `PanSize`) and operations models (`Neighborhood`, `CapacityOverride`, `Coupon`) mirroring `schema.sql`; verify `Base.metadata.tables` lists the 7 tables
-- [ ] 3.3 Implement `Customer`, `Order`, `SentMessage` and `Escalation` with the relationships from the design (`lazy="raise"`); verify `Base.metadata.tables` lists all 11 app tables and `sqlalchemy.orm.configure_mappers()` raises nothing
-- [ ] 3.4 Write `tests/integration/test_models.py`: live column names and nullability match `Base.metadata` for every table; every row of every model loads and the count matches; `bolo-chocolate` price is `Decimal("89.90")`; order dates are `date` and aware `datetime`; a cancelled order has `OrderStatus.CANCELLED`; `bolo-chocolate` allergen links include `gluten`/`contains` and `soy`/`may_contain`; an order's customer id matches; verify all pass against the seeded database
+- [x] 3.1 Create `models/base.py` (`Base`, `type_annotation_map`) and the `OrderStatus`, `Fulfillment` and `AllergenKind` `StrEnum`s; verify `python -c "import fornada_api.models"` works
+- [x] 3.2 Implement the catalog models (`Product`, `Allergen`, `ProductAllergen`, `PanSize`) and operations models (`Neighborhood`, `CapacityOverride`, `Coupon`) mirroring `schema.sql`; verify `Base.metadata.tables` lists the 7 tables
+- [x] 3.3 Implement `Customer`, `Order`, `SentMessage` and `Escalation` with the relationships from the design (`lazy="raise"`); verify `Base.metadata.tables` lists all 11 app tables and `sqlalchemy.orm.configure_mappers()` raises nothing
+- [x] 3.4 Write `tests/integration/test_models.py`: live column names and nullability match `Base.metadata` for every table; every row of every model loads and the count matches; `bolo-chocolate` price is `Decimal("89.90")`; order dates are `date` and aware `datetime`; a cancelled order has `OrderStatus.CANCELLED`; `bolo-chocolate` allergen links include `gluten`/`contains` and `soy`/`may_contain`; an order's customer id matches; verify all pass against the seeded database
 
 ## 4. Connection dependency (`database-access`)
 
