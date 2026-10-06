@@ -1,0 +1,4 @@
+# uv workspace root. Each app under apps/ is its own package; they share one
+# uv.lock and one .venv at the repo root.
+[tool.uv.workspace]
+members = ["apps/*"]
