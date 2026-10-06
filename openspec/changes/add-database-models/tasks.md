@@ -7,9 +7,9 @@
 
 ## 2. Database settings (`app-config`)
 
-- [ ] 2.1 Add `DbSettings` (`url: SecretStr`, scheme validator for `postgresql://`/`postgres://`) and the required `db` field to `Settings`; update the existing unit-test fixture to set `DB__URL`; verify the existing `test_config.py` tests pass
-- [ ] 2.2 Add unit tests for the `app-config` delta scenarios (missing `DB__URL`, non-PostgreSQL URL, plain URL accepted, password masked in `str`/`repr`/dump); verify they pass
-- [ ] 2.3 Add `DB__URL` to `.env.example` with a placeholder and a comment pointing to `DATABASE_URI`, and update the README "Configuration" section; verify the `.env.example` loading test still passes
+- [x] 2.1 Add `DbSettings` (`url: SecretStr`, scheme validator for `postgresql://`/`postgres://`) and the required `db` field to `Settings`; update the existing unit-test fixture to set `DB__URL`; verify the existing `test_config.py` tests pass
+- [x] 2.2 Add unit tests for the `app-config` delta scenarios (missing `DB__URL`, non-PostgreSQL URL, plain URL accepted, password masked in `str`/`repr`/dump); verify they pass
+- [x] 2.3 Add `DB__URL` to `.env.example` with a placeholder and a comment pointing to `DATABASE_URI`, and update the README "Configuration" section; verify the `.env.example` loading test still passes
 
 ## 3. Models (`database-access`)
 

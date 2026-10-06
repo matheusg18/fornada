@@ -15,13 +15,18 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     import os
 
     for name in list(os.environ):
-        if name.upper().startswith(("LLM__", "APP__", "LOG__")):
+        if name.upper().startswith(("LLM__", "APP__", "LOG__", "DB__")):
             monkeypatch.delenv(name)
+
+
+DB_URL = "postgresql://fornada:db-secret@postgres:5432/fornada"
 
 
 @pytest.fixture
 def with_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The required settings: an Anthropic key and a database URL."""
     monkeypatch.setenv("LLM__ANTHROPIC__API_KEY", "sk-ant-test")
+    monkeypatch.setenv("DB__URL", DB_URL)
 
 
 def load(**kwargs: object) -> Settings:
@@ -73,6 +78,7 @@ def test_default_provider(with_key: None) -> None:
 def test_switch_to_openai(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM__PROVIDER", "openai")
     monkeypatch.setenv("LLM__OPENAI__API_KEY", "sk-oa-test")
+    monkeypatch.setenv("DB__URL", DB_URL)
     settings = load()
     assert settings.llm.provider == "openai"
     assert settings.llm.active.model == "gpt-5-mini"
@@ -129,6 +135,38 @@ def test_config_error_does_not_leak_keys(monkeypatch: pytest.MonkeyPatch) -> Non
     printed = "".join(traceback.format_exception(exc_info.value))
     assert "LLM__OPENAI__API_KEY" in printed
     assert "sk-SEC" not in printed
+
+
+# --- database ----------------------------------------------------------------
+
+
+def test_missing_database_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM__ANTHROPIC__API_KEY", "sk-ant-test")
+    with pytest.raises(ConfigError, match="DB__URL"):
+        load()
+
+
+def test_empty_database_url(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DB__URL", "")
+    with pytest.raises(ConfigError, match="DB__URL"):
+        load()
+
+
+def test_non_postgres_database_url(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DB__URL", "mysql://user:pass-SEC@host/db")
+    with pytest.raises(ConfigError, match="DB__URL") as exc_info:
+        load()
+    assert "pass-SEC" not in "".join(traceback.format_exception(exc_info.value))
+
+
+def test_plain_postgres_url(with_key: None) -> None:
+    assert load().db.url.get_secret_value() == DB_URL
+
+
+def test_database_password_is_masked(with_key: None) -> None:
+    settings = load()
+    for text in (str(settings), repr(settings), str(settings.model_dump())):
+        assert "db-secret" not in text
 
 
 # --- time zone and log level -------------------------------------------------

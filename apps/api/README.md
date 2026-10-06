@@ -5,7 +5,8 @@ FastAPI service that runs the LangGraph ordering agent.
 ## Configuration
 
 Settings come from environment variables and the `.env` file at the repo root
-(the environment wins). Copy `.env.example` to `.env` and fill in an API key.
+(the environment wins). Copy `.env.example` to `.env` and fill in an API key
+and the database URL.
 Run every command from the repo root so `.env` is found.
 
 Nested settings use a double underscore, `NAMESPACE__FIELD`:
@@ -17,6 +18,7 @@ Nested settings use a double underscore, `NAMESPACE__FIELD`:
 | `LLM__OPENAI__API_KEY` / `LLM__OPENAI__MODEL` | – / `gpt-5-mini` | Required when OpenAI is active |
 | `APP__TIMEZONE` | `America/Sao_Paulo` | IANA time zone for "now" and dates |
 | `LOG__LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` or `CRITICAL` |
+| `DB__URL` | – (required) | PostgreSQL URL (`postgresql://…`); in the dev container, the value of `$DATABASE_URI` |
 
 Startup fails with a `ConfigError` that names the offending variable.
 
