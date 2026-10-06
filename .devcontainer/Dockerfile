@@ -1,4 +1,7 @@
-FROM mcr.microsoft.com/devcontainers/base:trixie
+# Versions are pinned exactly; Dependabot (.github/dependabot.yml) opens PRs to bump them.
+FROM ghcr.io/astral-sh/uv:0.12.23 AS uv
+
+FROM mcr.microsoft.com/devcontainers/base:2.2.1-trixie
 
 ARG TZ=America/Sao_Paulo
 ENV TZ=${TZ}
@@ -16,7 +19,7 @@ RUN apt-get update \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # uv and uvx. Python itself is managed by uv.
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+COPY --from=uv /uv /uvx /usr/local/bin/
 
 # Claude Code policy for this container only: start in bypassPermissions mode.
 COPY managed-settings.json /etc/claude-code/managed-settings.json

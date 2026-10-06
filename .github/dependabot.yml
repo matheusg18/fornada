@@ -1,0 +1,29 @@
+# Keeps pinned versions current. Each ecosystem opens one grouped PR per week.
+version: 2
+updates:
+  # Base and uv images in .devcontainer/Dockerfile
+  - package-ecosystem: docker
+    directory: /.devcontainer
+    schedule:
+      interval: weekly
+    groups:
+      dockerfile:
+        patterns: ["*"]
+
+  # Service images in .devcontainer/compose.yaml
+  - package-ecosystem: docker-compose
+    directory: /.devcontainer
+    schedule:
+      interval: weekly
+    groups:
+      compose:
+        patterns: ["*"]
+
+  # Dev container features (and devcontainer-lock.json)
+  - package-ecosystem: devcontainers
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      devcontainer-features:
+        patterns: ["*"]

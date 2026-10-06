@@ -131,7 +131,7 @@ Distrust simulator numbers: an agent that scores 95% against self-written person
 - **Small steps.** Before each step, announce it and wait for the maintainer's approval. Make one commit per step.
 - **Commits.** Use Conventional Commits prefixes (`feat:`, `fix:`, `chore:`, `docs:`…) and write the message in English. Older commits in Portuguese stay as they are; never rewrite history.
 - **Language.** Everything in the repo is in English: code, identifiers, comments, docs, OpenSpec artifacts and commit messages. The only exception is text the bot shows to customers (prompts, replies, seed data, test conversations), which is in Brazilian Portuguese. The maintainer usually talks to agents in Portuguese; answer them in Portuguese, but write repo content in English.
-- **Latest versions.** Before adding a dependency, image or tool, check its latest version and current docs. Install through the tool (`uv add`, `npm install`, official install scripts) so it resolves the latest release; do not hand-write versions into `pyproject.toml` or `package.json`.
+- **Latest versions.** Before adding a dependency, image or tool, check its latest version and current docs. Install through the tool (`uv add`, `npm install`, official install scripts) so it resolves the latest release; do not hand-write versions into `pyproject.toml` or `package.json`. Container images (Dockerfile, compose) are the exception: pin them to the exact latest version (or a digest when the registry only publishes `latest`), so Dependabot (`.github/dependabot.yml`) can open PRs to bump them. Dev container features are locked in `devcontainer-lock.json`.
 
 ## Dev environment
 

@@ -9,6 +9,9 @@
 # Langfuse v4 needs ClickHouse, Valkey (Redis-compatible) and S3-compatible
 # blob storage (MinIO) in addition to Postgres. Based on
 # https://github.com/langfuse/langfuse/blob/main/docker-compose.yml
+#
+# Image versions are pinned exactly; Dependabot (.github/dependabot.yml) opens
+# PRs to bump them. Keep langfuse-web and langfuse-worker on the same version.
 
 x-langfuse-env: &langfuse-env
   NEXTAUTH_URL: http://localhost:3000
@@ -73,7 +76,9 @@ services:
         condition: service_healthy
 
   postgres:
-    image: docker.io/postgres:18
+    # A major bump (18 -> 19) needs a data migration (pg_upgrade or dump/restore),
+    # not just a new tag. Same for Langfuse majors: read their upgrade guide first.
+    image: docker.io/postgres:18.6-trixie
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
@@ -94,7 +99,7 @@ services:
       retries: 10
 
   langfuse-web:
-    image: docker.langfuse.com/langfuse/langfuse:4
+    image: docker.langfuse.com/langfuse/langfuse:4.53.0
     restart: unless-stopped
     depends_on: *langfuse-depends-on
     ports:
@@ -117,14 +122,14 @@ services:
       LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_ADMIN_PASSWORD:?}
 
   langfuse-worker:
-    image: docker.langfuse.com/langfuse/langfuse-worker:4
+    image: docker.langfuse.com/langfuse/langfuse-worker:4.53.0
     restart: unless-stopped
     depends_on: *langfuse-depends-on
     environment: *langfuse-env
 
   clickhouse:
     # Latest LTS. Langfuse v4 requires ClickHouse >= 25.12.
-    image: docker.io/clickhouse/clickhouse-server:26.8
+    image: docker.io/clickhouse/clickhouse-server:26.8.18.2
     restart: unless-stopped
     user: "101:101"
     environment:
@@ -143,7 +148,7 @@ services:
 
   valkey:
     # Redis-compatible; Langfuse supports Valkey >= 8.
-    image: docker.io/valkey/valkey:9-alpine
+    image: docker.io/valkey/valkey:9.1.2-alpine
     restart: unless-stopped
     # Queue jobs must never be evicted.
     command: valkey-server --requirepass ${VALKEY_PASSWORD:?} --maxmemory-policy noeviction
@@ -156,7 +161,8 @@ services:
       retries: 10
 
   minio:
-    image: cgr.dev/chainguard/minio
+    # Chainguard's free tier only publishes `latest`, so it is pinned by digest.
+    image: cgr.dev/chainguard/minio:latest@sha256:a05a4497e8dce3cb7a7a1bf1872ba5d30ea988f1e8c22c9e0920503761c4b5f1
     restart: unless-stopped
     entrypoint: sh
     # Create the `langfuse` bucket before starting the server.
