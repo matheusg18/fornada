@@ -7,8 +7,10 @@ import os
 from collections.abc import AsyncIterator, Iterator
 
 import pytest
-from sqlalchemy import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+
+from fornada_api.core.config import get_settings
+from fornada_api.infrastructure.engine import get_engine, get_sessionmaker, to_async_url
 
 DATABASE_URI = os.environ.get("DATABASE_URI")
 
@@ -26,26 +28,37 @@ def anyio_backend() -> str:
     return "asyncio"
 
 
+def clear_caches() -> None:
+    get_settings.cache_clear()
+    get_engine.cache_clear()
+    get_sessionmaker.cache_clear()
+
+
 @pytest.fixture(autouse=True)
 def db_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Point the app at the seeded database, with a placeholder LLM key."""
-    from fornada_api.core.config import get_settings
-
     if DATABASE_URI:
         monkeypatch.setenv("DB__URL", DATABASE_URI)
     monkeypatch.setenv("LLM__PROVIDER", "anthropic")
     monkeypatch.setenv("LLM__ANTHROPIC__API_KEY", "sk-ant-test")
-    get_settings.cache_clear()
+    clear_caches()
     yield
-    get_settings.cache_clear()
+    clear_caches()
+
+
+@pytest.fixture
+async def app_engine() -> AsyncIterator[AsyncEngine]:
+    """The app's cached engine, disposed after the test so no connection leaks."""
+    engine = get_engine()
+    yield engine
+    await engine.dispose()
 
 
 @pytest.fixture
 async def engine() -> AsyncIterator[AsyncEngine]:
     """A test-owned engine, independent of the app's cached one."""
     assert DATABASE_URI
-    url = make_url(DATABASE_URI).set(drivername="postgresql+psycopg")
-    engine = create_async_engine(url)
+    engine = create_async_engine(to_async_url(DATABASE_URI))
     yield engine
     await engine.dispose()
 

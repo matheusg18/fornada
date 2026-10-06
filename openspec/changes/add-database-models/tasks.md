@@ -20,9 +20,9 @@
 
 ## 4. Connection dependency (`database-access`)
 
-- [ ] 4.1 Implement `infrastructure/engine.py`: URL rewrite to `postgresql+psycopg`, cached `get_engine()` (`application_name="fornada-api"`, `pool_pre_ping=True`) and cached `get_sessionmaker()` (`expire_on_commit=False`, `autoflush=False`); verify a unit test that the rewrite keeps user, password, host, port and database
-- [ ] 4.2 Implement `dependencies/database.py` with `get_db_session` (consumes `get_sessionmaker()`) and `DbSessionDep`; re-export `DbSessionDep` from `dependencies/__init__.py`; verify `python -c "from fornada_api.dependencies import DbSessionDep"` works
-- [ ] 4.3 Write `tests/integration/test_session.py`: a session that adds a `SentMessage` and closes without commit leaves no row; a session closed after an exception returns its connection to the pool (`engine.pool.checkedout() == 0`); verify both pass
+- [x] 4.1 Implement `infrastructure/engine.py`: URL rewrite to `postgresql+psycopg`, cached `get_engine()` (`application_name="fornada-api"`, `pool_pre_ping=True`) and cached `get_sessionmaker()` (`expire_on_commit=False`, `autoflush=False`); verify a unit test that the rewrite keeps user, password, host, port and database
+- [x] 4.2 Implement `dependencies/database.py` with `get_db_session` (consumes `get_sessionmaker()`) and `DbSessionDep`; re-export `DbSessionDep` from `dependencies/__init__.py`; verify `python -c "from fornada_api.dependencies import DbSessionDep"` works
+- [x] 4.3 Write `tests/integration/test_session.py`: a session that adds a `SentMessage` and closes without commit leaves no row; a session closed after an exception returns its connection to the pool (`engine.pool.checkedout() == 0`); verify both pass
 
 ## 5. FastAPI app (`api-service`)
 
