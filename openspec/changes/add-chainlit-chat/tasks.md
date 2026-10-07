@@ -11,8 +11,8 @@
 
 ## 3. API client (`chat-ui`: messages, replies, failures, config, no text in logs)
 
-- [ ] 3.1 Add `fornada_chat/client.py` with `load_api_url(environ)` (default `http://localhost:8000`, from `CHAT__API_URL`), `API_URL`, `ERROR_MESSAGE` (Brazilian Portuguese), `ApiError` and `send_message(http, conversation_id, text) -> list[str]` (POST `{"text": text}` to `/conversations/{id}/messages`; `ApiError` on connect error, timeout, non-200 or a body without `replies[].text`; one `WARNING` log with `conversation_id` and the failure kind, never the text)
-- [ ] 3.2 Add `apps/chat/tests/unit/test_client.py` with `httpx.MockTransport` and `pytest.mark.anyio`: path and body sent, two replies returned in order, `load_api_url` default and `CHAT__API_URL` override, and `ApiError` for connect error, timeout, HTTP 500 and a malformed body; a test sending `Meu telefone é 81987654321` through a failing transport asserts no captured log record contains `81987654321`; verify `uv run task test` in `apps/chat` passes
+- [x] 3.1 Add `fornada_chat/client.py` with `load_api_url(environ)` (default `http://localhost:8000`, from `CHAT__API_URL`), `API_URL`, `ERROR_MESSAGE` (Brazilian Portuguese), `ApiError` and `send_message(http, conversation_id, text) -> list[str]` (POST `{"text": text}` to `/conversations/{id}/messages`; `ApiError` on connect error, timeout, non-200 or a body without `replies[].text`; one `WARNING` log with `conversation_id` and the failure kind, never the text)
+- [x] 3.2 Add `apps/chat/tests/unit/test_client.py` with `httpx.MockTransport` and `pytest.mark.anyio`: path and body sent, two replies returned in order, `load_api_url` default and `CHAT__API_URL` override, and `ApiError` for connect error, timeout, HTTP 500 and a malformed body; a test sending `Meu telefone é 81987654321` through a failing transport asserts no captured log record contains `81987654321`; verify `uv run task test` in `apps/chat` passes
 
 ## 4. Chainlit layer (`chat-ui`: session id, text-only input, launch)
 
