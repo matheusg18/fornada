@@ -54,23 +54,38 @@ no "create" call.
 ```bash
 curl -s -X POST "localhost:8000/conversations/$(python3 -c 'import uuid; print(uuid.uuid4())')/messages" \
   -H 'content-type: application/json' -d '{"text": "Oi, quero um bolo de chocolate"}'
-# {"conversation_id":"…","replies":[{"text":"Olá! Aqui é a Fornada. …"}]}
+# {"conversation_id":"…","replies":[{"text":"Olá! …"}]}
 ```
 
 - `replies` holds one or more messages; clients must show all of them, in order.
 - `422` when the id is not a UUID, or `text` is missing, not a string or blank.
-- For now every message gets the same fixed reply (`FixedAttendant` in
-  `agents/attendant/attendant.py`): no LLM call, nothing stored, no database
-  needed. The LangGraph graph will replace it behind `AttendantDep`.
+- Replies come from the attendant agent (`agents/attendant/`): a LangGraph ReAct
+  loop over the nine tools. It needs the LLM key and the database. A turn that
+  fails (provider or database error, step limit) returns `503` with a generic
+  body; the cause is logged with the conversation id.
+- Memory: the conversation id is the LangGraph `thread_id`. Messages are saved
+  by the PostgreSQL checkpointer (`checkpoints*` tables in the app database,
+  created by the library on the first turn). They survive restarts.
 - Each turn logs `conversation turn` with `conversation_id` and `text_length`.
   The message text is never logged.
 - v0 has no authentication, rate limit or size cap on purpose (phase 5 measures
   those attacks first).
 
+## System prompt and its version
+
+The prompt is `fornada_api/agents/attendant/prompts/system.md`. Its version is
+`sha256:` plus the first 12 hex digits of the SHA-256 of the file (UTF-8, `\n`
+line endings), so it changes with any edit and can be reproduced with
+`sha256sum`. The version is logged at startup (`prompt_version`) and saved on
+every model answer (`response_metadata["prompt_version"]`) and in the graph
+state, so each answer in a conversation says which prompt wrote it. Restart the
+server after editing the prompt: `fastapi dev` reloads only on `.py` changes.
+
 ## Database
 
 Models live in `fornada_api/models/` and mirror `.devcontainer/db/schema.sql`,
-which stays the only source of DDL: the app never creates or alters tables.
+which stays the only source of DDL: the app never creates or alters app tables.
+The LangGraph checkpointer is the one exception: it creates its own tables.
 `fornada_api/infrastructure/engine.py` builds the async engine (psycopg 3) and
 session factory; path operations get a session with `DbSessionDep` from
 `fornada_api/dependencies`. Sessions never commit on their own. Relationships
