@@ -6,8 +6,8 @@
 
 ## 2. Chat app scaffolding
 
-- [ ] 2.1 Add `chainlit` and `httpx` with `uv add --package fornada-chat`, and the dev group (`ruff`, `pyright`, `pytest`, `taskipy`) with `uv add --package fornada-chat --dev`; verify `uv sync` resolves and `uv run --package fornada-chat chainlit --version` prints 2.12.x
-- [ ] 2.2 Configure ruff, pyright and pytest in `apps/chat/pyproject.toml` like `apps/api` (py313, `--import-mode=importlib`), add taskipy tasks `dev` (`chainlit run src/fornada_chat/app.py -w --headless --port 8001`), `test`, `lint`, `lint:fix`, `format`, `format:check`, `typecheck`, `check`; drop the `fornada-chat` script and the placeholder `main()`; verify `uv run task --list` in `apps/chat` shows them
+- [x] 2.1 Add `chainlit` and `httpx` with `uv add --package fornada-chat`, and the dev group (`ruff`, `pyright`, `pytest`, `taskipy`) with `uv add --package fornada-chat --dev`; verify `uv sync` resolves and `uv run --package fornada-chat chainlit --version` prints 2.12.x
+- [x] 2.2 Configure ruff, pyright and pytest in `apps/chat/pyproject.toml` like `apps/api` (py313, `--import-mode=importlib`), add taskipy tasks `dev` (`chainlit run src/fornada_chat/app.py -w --headless --port 8001`), `test`, `lint`, `lint:fix`, `format`, `format:check`, `typecheck`, `check`; drop the `fornada-chat` script and the placeholder `main()`; verify `uv run task --list` in `apps/chat` shows them
 
 ## 3. API client (`chat-ui`: messages, replies, failures, config, no text in logs)
 
