@@ -1,4 +1,7 @@
 {
+  "env": {
+    "PLAYWRIGHT_MCP_NO_SANDBOX": "1"
+  },
   "enabledPlugins": {
     "langchain-skills@langchain-skills": true,
     "langfuse@claude-plugins-official": true,
