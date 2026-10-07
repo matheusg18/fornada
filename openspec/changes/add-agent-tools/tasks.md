@@ -8,8 +8,8 @@
 
 ## 2. Service foundations (`bakery-rules`)
 
-- [ ] 2.1 Implement `services/errors.py` (`DomainError` and the subclasses named in the design), `services/money.py` (round half up to 2 places, weight to 1 place, `Decimal` to string), `services/phones.py` (E.164 normalization for Brazilian numbers) and `services/clock.py` (`Clock` protocol, system clock in `APP__TIMEZONE`, fixed clock for tests); add unit tests: `89.90 × 2.5 = 224.75`, `234.75 / 2 → 117.38`, `(81) 98765-4321 → +5581987654321`, an unparseable phone raises, the late-evening-UTC case gives the São Paulo date; verify `uv run task test:unit` passes
-- [ ] 2.2 Define the repository `Protocol`s the services depend on and in-memory fakes in `tests/unit/services/fakes.py`, loaded with a small copy of the seed catalog (pans P/M/G, `bolo-chocolate`, one custom product, `Ipsep` at `10.00`, the five seed coupons); verify `uv run task typecheck` passes
+- [x] 2.1 Implement `services/errors.py` (`DomainError` and the subclasses named in the design), `services/money.py` (round half up to 2 places, weight to 1 place, `Decimal` to string), `services/phones.py` (E.164 normalization for Brazilian numbers) and `services/clock.py` (`Clock` protocol, system clock in `APP__TIMEZONE`, fixed clock for tests); add unit tests: `89.90 × 2.5 = 224.75`, `234.75 / 2 → 117.38`, `(81) 98765-4321 → +5581987654321`, an unparseable phone raises, the late-evening-UTC case gives the São Paulo date; verify `uv run task test:unit` passes
+- [x] 2.2 Define the repository `Protocol`s the services depend on and in-memory fakes in `tests/unit/services/fakes.py`, loaded with a small copy of the seed catalog (pans P/M/G, `bolo-chocolate`, one custom product, `Ipsep` at `10.00`, the five seed coupons); verify `uv run task typecheck` passes
 
 ## 3. Quotes, capacity and catalog rules (`bakery-rules`)
 
