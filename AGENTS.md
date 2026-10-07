@@ -129,6 +129,7 @@ Distrust simulator numbers: an agent that scores 95% against self-written person
 
 - **Spec-driven development with OpenSpec.** Non-trivial changes start as an OpenSpec change: `/opsx:propose` → review → `/opsx:apply` → `/opsx:archive`. Specs live in `openspec/specs/`, and in-flight changes live in `openspec/changes/`. Write all OpenSpec artifacts in English (see `openspec/config.yaml`).
 - **Small steps.** Before each step, announce it and wait for the maintainer's approval. Make one commit per step.
+- **Verify before reporting.** After changing an app, run `uv run task check` from its directory (`apps/api`) before you commit or call a step done. It runs `ruff check`, `ruff format --check`, `pyright` and every test. Fix what fails; do not skip or silence a check (`noqa`, `pyright: ignore`, `skip`) without saying why. While iterating, run the narrower task (`lint`, `typecheck`, `test:unit`, `test:integration`). When the change is visible over HTTP, also start the server with `uv run task dev` and hit the endpoint.
 - **Commits.** Use Conventional Commits prefixes (`feat:`, `fix:`, `chore:`, `docs:`…) and write the message in English. Older commits in Portuguese stay as they are; never rewrite history.
 - **Language.** Everything in the repo is in English: code, identifiers, comments, docs, OpenSpec artifacts and commit messages. The only exception is text the bot shows to customers (prompts, replies, seed data, test conversations), which is in Brazilian Portuguese. The maintainer usually talks to agents in Portuguese; answer them in Portuguese, but write repo content in English.
 - **Latest versions.** Before adding a dependency, image or tool, check its latest version and current docs. Install through the tool (`uv add`, `npm install`, official install scripts) so it resolves the latest release; do not hand-write versions into `pyproject.toml` or `package.json`. Container images (Dockerfile, compose) are the exception: pin them to the exact latest version (or a digest when the registry only publishes `latest`), so Dependabot (`.github/dependabot.yml`) can open PRs to bump them. Dev container features are locked in `devcontainer-lock.json`.
@@ -173,6 +174,7 @@ apps/
 - Never create a `.venv` inside an app. Run `uv sync` at the root; it installs every member.
 - Add a dependency to one app with `uv add --package fornada-api <pkg>`, and run an app with `uv run --package fornada-api …`.
 - A new app goes under `apps/` with `uv init --package apps/<name>`; the glob picks it up.
+- Each app's tooling (ruff, pyright, pytest and its `taskipy` tasks) is configured in its own `pyproject.toml`. Run tasks from the app's directory, `uv run task <name>` (or `uv run --directory apps/<name> task <name>` from the root); `uv run task --list` shows them.
 
 ## Dev environment
 
