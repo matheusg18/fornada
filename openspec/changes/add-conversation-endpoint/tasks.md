@@ -2,7 +2,7 @@
 
 ## 1. Attendant seam
 
-- [ ] 1.1 Add `agents/attendant/attendant.py` with the `Attendant` protocol (`async reply(conversation_id: UUID, text: str) -> list[str]`), `FIXED_REPLY` (Brazilian Portuguese) and `FixedAttendant`; add `dependencies/attendant.py` with `get_attendant` and `AttendantDep`, exported from `dependencies/__init__.py`; add a unit test that `FixedAttendant().reply(...)` returns `[FIXED_REPLY]` for two different ids and texts; verify `uv run task test:unit` and `uv run task typecheck` pass
+- [x] 1.1 Add `agents/attendant/attendant.py` with the `Attendant` protocol (`async reply(conversation_id: UUID, text: str) -> list[str]`), `FIXED_REPLY` (Brazilian Portuguese) and `FixedAttendant`; add `dependencies/attendant.py` with `get_attendant` and `AttendantDep`, exported from `dependencies/__init__.py`; add a unit test that `FixedAttendant().reply(...)` returns `[FIXED_REPLY]` for two different ids and texts; verify `uv run task test:unit` and `uv run task typecheck` pass
 
 ## 2. Endpoint (`conversation-api`)
 
