@@ -13,9 +13,9 @@
 
 ## 3. Quotes, capacity and catalog rules (`bakery-rules`)
 
-- [ ] 3.1 Implement `services/quotes.py`: weight validation (0.5 step, 1.0–6.0 from the pan table), pan size from weight (boundary → smaller pan), quote with delivery fee, discount `0.00`, total and deposit; unknown/inactive product and missing/unknown neighborhood errors (the latter listing served neighborhoods); add unit tests for every `bakery-rules` scenario on weight, pan size, quote, deposit and quote prerequisites; verify they pass
-- [ ] 3.2 Implement `services/capacity.py`: capacity from override or default setting, used kg from non-cancelled orders, free kg floored at zero, override reason, earliest regular (+2) and custom (+5) dates and the two lead-time flags; add unit tests for the full day, holiday, cancelled-order and lead-time scenarios with a fixed clock; verify they pass
-- [ ] 3.3 Implement `services/catalog.py`: search active products by case-insensitive name/description match (all without a query), with allergens split into contains / may contain, cost per kg, pan sizes and active neighborhoods; add unit tests for the no-query and `sem farinha` cases; verify they pass
+- [x] 3.1 Implement `services/quotes.py`: weight validation (0.5 step, 1.0–6.0 from the pan table), pan size from weight (boundary → smaller pan), quote with delivery fee, discount `0.00`, total and deposit; unknown/inactive product and missing/unknown neighborhood errors (the latter listing served neighborhoods); add unit tests for every `bakery-rules` scenario on weight, pan size, quote, deposit and quote prerequisites; verify they pass
+- [x] 3.2 Implement `services/capacity.py`: capacity from override or default setting, used kg from non-cancelled orders, free kg floored at zero, override reason, earliest regular (+2) and custom (+5) dates and the two lead-time flags; add unit tests for the full day, holiday, cancelled-order and lead-time scenarios with a fixed clock; verify they pass
+- [x] 3.3 Implement `services/catalog.py`: search active products by case-insensitive name/description match (all without a query), with allergens split into contains / may contain, cost per kg, pan sizes and active neighborhoods; add unit tests for the no-query and `sem farinha` cases; verify they pass
 
 ## 4. Order, coupon and messaging rules (`bakery-rules`)
 
