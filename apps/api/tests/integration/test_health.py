@@ -27,9 +27,7 @@ def test_no_personal_data_in_response() -> None:
     assert DATABASE_URI
     with psycopg.connect(DATABASE_URI) as conn:
         customers = conn.execute("SELECT name, phone FROM customers").fetchall()
-        addresses = conn.execute(
-            "SELECT address FROM orders WHERE address IS NOT NULL"
-        ).fetchall()
+        addresses = conn.execute("SELECT address FROM orders WHERE address IS NOT NULL").fetchall()
     with TestClient(app) as client:
         text = client.get("/health/db").text
     for value in [v for row in customers + addresses for v in row]:
@@ -64,11 +62,8 @@ def test_no_connection_left_after_shutdown() -> None:
     assert count_app_connections() == 0
 
 
-def test_startup_without_database_url(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_startup_without_database_url(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.delenv("DB__URL")
     monkeypatch.chdir(tmp_path)  # no root `.env` that could supply it
-    with pytest.raises(ConfigError, match="DB__URL"):
-        with TestClient(app):
-            pass
+    with pytest.raises(ConfigError, match="DB__URL"), TestClient(app):
+        pass

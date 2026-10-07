@@ -37,7 +37,7 @@ async def db_health(session: DbSessionDep, response: Response) -> DbHealth:
             # Selects every mapped column, so a model that drifted from the
             # schema fails here.
             (await session.scalars(select(model).limit(1))).first()
-    except (SQLAlchemyError, OSError):
+    except SQLAlchemyError, OSError:
         # The driver's message names the host; keep it in the logs only.
         logger.exception("database health check failed")
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE

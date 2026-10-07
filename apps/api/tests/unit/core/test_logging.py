@@ -95,7 +95,7 @@ def test_non_serializable_extras_become_strings(
 def test_exception_is_serialized_on_one_line(capsys: pytest.CaptureFixture[str]) -> None:
     setup()
     try:
-        1 / 0
+        raise ZeroDivisionError("division by zero")
     except ZeroDivisionError:
         logging.getLogger("t").exception("boom")
     record = one_record(capsys)
