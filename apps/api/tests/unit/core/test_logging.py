@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import pytest
 
-from fornada_api.core.config import LogSettings
+from fornada_api.core.config import LogLevel, LogSettings
 from fornada_api.core.logging import configure_logging
 
 
@@ -28,7 +28,7 @@ def one_record(capsys: pytest.CaptureFixture[str]) -> dict:
     return json.loads(out[0])
 
 
-def setup(level: str = "INFO") -> None:
+def setup(level: LogLevel = "INFO") -> None:
     configure_logging(LogSettings(level=level))
 
 

@@ -31,9 +31,8 @@ async def db_health(session: DbSessionDep, response: Response) -> DbHealth:
     try:
         for mapper in sorted(Base.registry.mappers, key=lambda m: m.class_.__tablename__):
             model = mapper.class_
-            tables[model.__tablename__] = await session.scalar(
-                select(func.count()).select_from(model)
-            )
+            count = await session.execute(select(func.count()).select_from(model))
+            tables[model.__tablename__] = count.scalar_one()
             # Selects every mapped column, so a model that drifted from the
             # schema fails here.
             (await session.scalars(select(model).limit(1))).first()
