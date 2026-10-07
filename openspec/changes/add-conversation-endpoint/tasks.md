@@ -13,7 +13,7 @@
 
 ## 3. Integration check
 
-- [ ] 3.1 Run `uv run task check` in `apps/api` and verify it passes; start `uv run task dev` and `curl -X POST localhost:8000/conversations/$(python3 -c 'import uuid; print(uuid.uuid4())')/messages -H 'content-type: application/json' -d '{"text":"oi"}'`, verifying a 200 with the fixed reply and a `conversation turn` JSON log line without the text
+- [x] 3.1 Run `uv run task check` in `apps/api` and verify it passes; start `uv run task dev` and `curl -X POST localhost:8000/conversations/$(python3 -c 'import uuid; print(uuid.uuid4())')/messages -H 'content-type: application/json' -d '{"text":"oi"}'`, verifying a 200 with the fixed reply and a `conversation turn` JSON log line without the text
 
 ## Workflow follow-up
 
