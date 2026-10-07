@@ -1,0 +1,44 @@
+# Tasks
+
+## 1. Dependencies
+
+- [x] 1.1 From the repo root, check the latest releases and run `uv add --package fornada-api langchain-anthropic langchain-openai "langgraph-checkpoint-postgres" psycopg-pool`; verify `uv sync` succeeds and `uv run --package fornada-api python -c "import langchain_anthropic, langchain_openai, langgraph.checkpoint.postgres.aio, psycopg_pool"` exits 0
+
+## 2. Versioned system prompt (`prompt-versioning`)
+
+- [ ] 2.1 Add `agents/attendant/prompts/system.md` with the naive one-screen pt-BR v0 prompt (design Decision 11: role, what it helps with, use the tools, ask for what is missing, brief and friendly; no security rules, allergen disclaimers or date) and stop for the maintainer to review the text before going on; verify the file is under `src/fornada_api/agents/attendant/prompts/`
+- [ ] 2.2 Add `agents/attendant/prompt.py` with the frozen `SystemPrompt(text, version)` and `load_system_prompt()` (read via `importlib.resources`, normalize `\r\n` to `\n`, `version = "sha256:" + sha256[:12]`), accepting an optional source for tests; add `tests/unit/agents/test_prompt.py` covering: text equals the file, same content → same version, one changed character → different version, `\r\n` vs `\n` → same version, version matches `hashlib.sha256` of the committed file, format `^sha256:[0-9a-f]{12}$`; verify `uv run task test:unit` passes
+- [ ] 2.3 Verify the prompt ships in the built package: `uv build --package fornada-api` and list the wheel, checking `fornada_api/agents/attendant/prompts/system.md` is inside
+
+## 3. State, nodes, routing and graph (`attendant-agent`)
+
+- [ ] 3.1 Add `agents/attendant/state.py` with `InputState` (`messages` with `add_messages`), `OutputState` (`messages`, `prompt_version`) and `AttendantState` (both); verify `uv run task typecheck` passes
+- [ ] 3.2 Add `tests/unit/agents/fakes.py` with a scripted fake chat model (a `BaseChatModel` that returns queued `AIMessage`s, records the messages of each call and returns itself from `bind_tools`); verify it with a small test that two queued answers come back in order and both calls are recorded
+- [ ] 3.3 Add `agents/attendant/edges.py` with `route_after_model` (`"tools"` when the last message is an `AIMessage` with `tool_calls`, else `END`); add `tests/unit/agents/test_edges.py` for a tool-calling answer, a text answer and a text-plus-tool-calls answer; verify `uv run task test:unit` passes
+- [ ] 3.4 Add `agents/attendant/nodes.py` with `make_call_model(model, prompt)` (prepends `SystemMessage(prompt.text)`, stamps `response_metadata["prompt_version"]`, returns `{"messages": [answer], "prompt_version": prompt.version}`, never returns the system message) and the tool node built from the tools with `ToolNode`; add `tests/unit/agents/test_nodes.py` with the fake model checking: the model sees the system prompt first, the answer carries the version, the returned update holds no `SystemMessage`; verify `uv run task test:unit` passes
+- [ ] 3.5 Add `agents/attendant/graph.py` with `build_graph(model, tools, prompt)` returning the uncompiled `StateGraph(AttendantState, input_schema=InputState, output_schema=OutputState)` (`START → call_model`, conditional edge via `route_after_model`, `tools → call_model`), binding the tools to the model; add `tests/unit/agents/test_graph.py` compiled with `InMemorySaver` and stub tools (named like the real ones, no database) covering the `attendant-agent` scenarios: answer without tools (one model call, no tool run), one tool round, two tool calls in one answer, a tool error reaching the next model call, second turn sees the first (input holds only the new message), two thread ids isolated, output keys are exactly `messages` and `prompt_version`, stored history has no `SystemMessage`, each `AIMessage` in the checkpointed history carries the prompt version, and a prompt change between turns leaves version A on the old answer and B on the new one; verify `uv run task test:unit` passes
+- [ ] 3.6 Add `agents/attendant/model.py` with `build_chat_model(llm_settings)` returning `ChatAnthropic` or `ChatOpenAI` with the active model name and key; add unit tests that the default settings build an Anthropic model named `claude-haiku-4-5` and `provider=openai` builds an OpenAI model named `gpt-5-mini`, with no network call; verify `uv run task test:unit` passes
+
+## 4. Attendant and checkpointer
+
+- [ ] 4.1 In `agents/attendant/attendant.py`, remove `FixedAttendant` and `FIXED_REPLY`; add `FALLBACK_REPLY` (pt-BR), `RECURSION_LIMIT = 25`, `turn_replies(messages)` (non-empty `.text` of the `AIMessage`s after the last `HumanMessage`) and `GraphAttendant(compiled_graph)` whose `reply` invokes the graph with `thread_id = str(conversation_id)` and the recursion limit and falls back to `[FALLBACK_REPLY]`; replace `tests/unit/agents/test_attendant.py` with tests for: text before a tool call plus the final text are both replies, only the current turn's texts are returned, empty text → fallback, the thread id passed to the graph equals the conversation id (checked through a stub `escalate_to_human`-style tool reading `ToolRuntime`), and a looping fake model raises `GraphRecursionError`; verify `uv run task test:unit` passes
+- [ ] 4.2 Add `infrastructure/checkpointer.py` that creates the `AsyncConnectionPool` from `settings.db.url` (`autocommit=True`, `prepare_threshold=0`, `row_factory=dict_row`, opened with `wait=False`) and an `AsyncPostgresSaver` whose `setup()` runs once, lazily, under an `asyncio.Lock`; add a unit test that opening the pool against an unreachable URL does not raise; verify `uv run task test:unit` passes
+- [ ] 4.3 Wire it in `main.py` lifespan: load the prompt, build the chat model, tools, graph compiled with the checkpointer and a `GraphAttendant` on `app.state`; close the pool on shutdown; add `prompt_version` to the `"fornada-api starting"` log record; change `dependencies/attendant.py` so `get_attendant` returns the attendant from `app.state`; verify `uv run task typecheck` passes and starting `uv run task dev` with PostgreSQL stopped still serves `GET /health/db` with 503
+
+## 5. Endpoint (`conversation-api`)
+
+- [ ] 5.1 In `conversations.py`, wrap `attendant.reply`: on any exception log `"turn failed"` with `logger.exception` and the conversation id (no text) and raise `HTTPException(503, "attendant unavailable")`; update `tests/unit/test_conversations.py` to override `get_attendant` with fakes instead of using `FIXED_REPLY`: replies returned in order, a failing attendant → 503 with a body that contains neither the DB password, the API key nor the exception text, and one `"turn failed"` record with the conversation id and without the message text; keep the 422 and turn-log tests; verify `uv run task test:unit` passes
+- [ ] 5.2 Add `tests/integration/agents/test_graph_memory.py` with the real `AsyncPostgresSaver` on the dev database and the scripted fake model: the checkpointer tables exist after the first turn and the 11 app tables are unchanged, a second turn sees the first, two conversation ids are isolated, a new pool and saver (simulated restart) still see the earlier turn, the stored `AIMessage` keeps its `prompt_version`; clean up the test threads with `adelete_thread`; verify `uv run task test:integration` passes
+- [ ] 5.3 Add an integration test that runs the endpoint with the real tools, real checkpointer and a scripted fake model that calls `escalate_to_human`; verify the escalation row holds the conversation id from the URL and the test passes
+- [ ] 5.4 Update `apps/api/README.md`: replies now come from the agent (LLM key and database needed), 503 on failed turns, conversation memory per id in the checkpointer tables, how the prompt version is computed and where it is recorded, and "restart the server after editing `prompts/system.md`"; verify the `curl` example works against `uv run task dev` with a real key
+
+## 6. Integration check
+
+- [ ] 6.1 Run `uv run task check` in `apps/api` and verify it passes
+- [ ] 6.2 With a real API key in `.env`, start `uv run task dev` and hold a short conversation over `curl` on one conversation id (ask for the catalog, then a quote for 2.5 kg of `bolo-chocolate` delivered to Ipsep); verify the replies use the tools (quote total `234.75`), the second message remembers the first, the startup log shows the prompt version, and `SELECT checkpoint->'channel_values'->>'prompt_version' FROM checkpoints WHERE thread_id = '<id>' ORDER BY checkpoint_id DESC LIMIT 1` (or `aget_state`) returns the same version
+- [ ] 6.3 Send one message from the Chainlit chat (`apps/chat`) and verify an agent reply appears
+
+## Workflow follow-up
+
+- Archive the change with `/opsx:archive` after review, syncing `attendant-agent`, `prompt-versioning`, `conversation-api` and `database-access` into `openspec/specs/`.
+- Phase 1 continues with the persona simulator; `v0` is tagged after 20 simulated conversations finish.
