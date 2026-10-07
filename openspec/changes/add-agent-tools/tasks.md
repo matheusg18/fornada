@@ -40,7 +40,7 @@
 
 ## 7. Integration check
 
-- [ ] 7.1 From `apps/api`, run `uv run task check`; then reset the database with the command in `.devcontainer/db/README.md`, run `uv run task test:integration` again, and confirm with `psql` that the row counts of `orders`, `customers`, `sent_messages` and `escalations` match the fresh seed; verify all pass
+- [x] 7.1 From `apps/api`, run `uv run task check`; then reset the database with the command in `.devcontainer/db/README.md`, run `uv run task test:integration` again, and confirm with `psql` that the row counts of `orders`, `customers`, `sent_messages` and `escalations` match the fresh seed; verify all pass
 
 ## Workflow follow-up
 
