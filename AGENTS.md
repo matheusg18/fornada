@@ -225,7 +225,7 @@ Notes:
 
 - The `postgres` MCP reads `DATABASE_URI` from the environment, so it only connects inside the dev container. `compose.yaml` builds the URI from `FORNADA_DB_PASSWORD` in `.devcontainer/.env` (role `fornada`, database `fornada`). Never commit credentials.
 - `postgres-mcp` 0.3.0 does not cap its `mcp` dependency and breaks with `mcp` 2.x (upstream issue crystaldba/postgres-mcp#208), so `.mcp.json` runs it with `--with "mcp<2"`. Drop the cap once upstream supports `mcp` 2.x.
-- Chrome cannot create its sandbox namespaces inside the dev container, so the `playwright` plugin's Chrome fails to start. `.claude/settings.json` sets `PLAYWRIGHT_MCP_SANDBOX=false`; the container is the isolation boundary. The `@playwright/mcp` README (0.0.83) documents `PLAYWRIGHT_MCP_NO_SANDBOX` for `--no-sandbox`, but the code only reads `PLAYWRIGHT_MCP_SANDBOX`, so the documented name has no effect. Restart Claude Code after changing it.
+- Chrome cannot create its sandbox namespaces inside the dev container, so the `playwright` plugin's Chrome fails to start. `.claude/settings.json` sets `PLAYWRIGHT_MCP_SANDBOX=false`; the container is the isolation boundary. The `@playwright/mcp` README (0.0.83) documents `PLAYWRIGHT_MCP_NO_SANDBOX` for `--no-sandbox`, but the code only reads `PLAYWRIGHT_MCP_SANDBOX`, so the documented name has no effect. It also sets `PLAYWRIGHT_MCP_HEADLESS=true`: the container has no usable X server, and the MCP opens a headed browser by default. Restart Claude Code after changing either.
 - The `postgres-best-practices` plugin bundles a Supabase docs MCP. It is disabled via `disabledMcpServers` in `.claude/settings.json` because this project does not use Supabase.
 
 ### Installing new agent resources
