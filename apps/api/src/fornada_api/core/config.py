@@ -8,7 +8,14 @@ from functools import cache
 from typing import Any, Literal, Self
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, Field, SecretStr, ValidationError, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    SecretStr,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LlmProvider = Literal["anthropic", "openai"]
@@ -63,6 +70,19 @@ class LogSettings(BaseModel):
         return data
 
 
+class DbSettings(BaseModel):
+    # Secret because the URL carries the database password.
+    url: SecretStr
+
+    @field_validator("url")
+    @classmethod
+    def _postgres_scheme(cls, url: SecretStr) -> SecretStr:
+        # Never echo the value: it holds the password.
+        if not url.get_secret_value().startswith(("postgresql://", "postgres://")):
+            raise ValueError("must be a PostgreSQL URL (postgresql://user:pass@host:port/db)")
+        return url
+
+
 class ConfigError(ValueError):
     """Settings failed validation. The message names environment variables."""
 
@@ -79,6 +99,15 @@ class Settings(BaseSettings):
     llm: LlmSettings = Field(default_factory=LlmSettings)
     app: AppSettings = AppSettings()
     log: LogSettings = LogSettings()
+    db: DbSettings
+
+    @model_validator(mode="before")
+    @classmethod
+    def _db_namespace_present(cls, data: object) -> object:
+        # Without any DB__* variable the error would point at `DB`, not `DB__URL`.
+        if isinstance(data, dict) and "db" not in data:
+            data = {**data, "db": {}}
+        return data
 
     def __init__(self, **kwargs: Any) -> None:
         try:

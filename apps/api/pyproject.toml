@@ -5,8 +5,11 @@ description = "Fornada API: FastAPI service that runs the LangGraph ordering age
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "fastapi[standard]>=0.142.2",
+    "psycopg[binary]>=3.3.6",
     "pydantic-settings>=2.15.0",
     "python-json-logger>=4.2.0",
+    "sqlalchemy[asyncio]>=2.1.3",
 ]
 
 [project.scripts]
@@ -20,3 +23,6 @@ build-backend = "uv_build"
 dev = [
     "pytest>=9.1.1",
 ]
+
+[tool.fastapi]
+entrypoint = "fornada_api.main:app"
