@@ -44,6 +44,29 @@ reload, from the root: `uv run --package fornada-api fornada-api`.
   (`200 {"status": "ok", "tables": {...}}`), or `503 {"status": "unavailable"}`
   when the database cannot be reached. It never returns row contents.
 
+## Conversations
+
+`POST /conversations/{conversation_id}/messages` sends one customer message and
+returns the bot's replies for that turn. The client generates the conversation
+id (a UUID4); the first message to an unseen id starts the conversation, with
+no "create" call.
+
+```bash
+curl -s -X POST "localhost:8000/conversations/$(python3 -c 'import uuid; print(uuid.uuid4())')/messages" \
+  -H 'content-type: application/json' -d '{"text": "Oi, quero um bolo de chocolate"}'
+# {"conversation_id":"…","replies":[{"text":"Olá! Aqui é a Fornada. …"}]}
+```
+
+- `replies` holds one or more messages; clients must show all of them, in order.
+- `422` when the id is not a UUID, or `text` is missing, not a string or blank.
+- For now every message gets the same fixed reply (`FixedAttendant` in
+  `agents/attendant/attendant.py`): no LLM call, nothing stored, no database
+  needed. The LangGraph graph will replace it behind `AttendantDep`.
+- Each turn logs `conversation turn` with `conversation_id` and `text_length`.
+  The message text is never logged.
+- v0 has no authentication, rate limit or size cap on purpose (phase 5 measures
+  those attacks first).
+
 ## Database
 
 Models live in `fornada_api/models/` and mirror `.devcontainer/db/schema.sql`,

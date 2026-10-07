@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from fornada_api import health
+from fornada_api import conversations, health
 from fornada_api.core.config import get_settings
 from fornada_api.core.logging import configure_logging
 from fornada_api.infrastructure.engine import get_engine
@@ -35,3 +35,4 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Fornada API", lifespan=lifespan)
 app.include_router(health.router)
+app.include_router(conversations.router)
