@@ -80,6 +80,7 @@ Same tooling as `apps/api` (dev group with `ruff`, `pyright`, `pytest`, `taskipy
 
 - [Workspace on 3.13 for Chainlit's sake] → Cost is one `except` clause and the version lines. Recorded in the proposal and README so it is reverted once Chainlit lifts the cap.
 - [Chainlit is a large dependency tree in the shared lock] → Only `fornada-chat` declares it, so `fornada-api` does not import it. Dependabot bumps arrive in the same lock.
+- [A Chainlit dependency (`literalai`) installs a top-level `tests` package in the shared `.venv`, which pyright prefers over the API's namespace `tests/`] → `apps/api/tests/`, `tests/unit/` and `tests/unit/services/` get empty `__init__.py` files, so the local package is a regular one and wins. Found while running the API check in task 5.1.
 - [Chainlit's default config allows any origin and has no auth] → Dev-only, local use in phase 1; same "no defenses in v0" stance as the API.
 - [Same session id survives Chainlit websocket reconnects but not page reloads] → Reload starts a new conversation, which matches the API being stateless today. Revisit when the checkpointer adds history.
 - [60 s timeout hides a hung agent for a minute] → Acceptable for a manual UI; phase 2 latency metrics show slow turns.
