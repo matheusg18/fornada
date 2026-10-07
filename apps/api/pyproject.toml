@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "fastapi[standard]>=0.142.2",
+    "langgraph>=1.2.14",
     "psycopg[binary]>=3.3.6",
     "pydantic-settings>=2.15.0",
     "python-json-logger>=4.2.0",
@@ -47,6 +48,8 @@ venv = ".venv"
 [tool.pytest.ini_options]
 addopts = "-ra --strict-markers --import-mode=importlib"
 testpaths = ["tests"]
+# Lets tests import shared helpers, e.g. `tests.unit.services.fakes`.
+pythonpath = ["."]
 markers = [
     "integration: needs the dev container's seeded Postgres (DATABASE_URI)",
 ]
