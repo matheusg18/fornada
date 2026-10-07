@@ -34,7 +34,8 @@ class ScriptedChatModel(BaseChatModel):
         self.calls.append(list(messages))
         # Loops on the last answer when the queue runs out of fresh ones.
         answer = self.answers.pop(0) if len(self.answers) > 1 else self.answers[0]
-        return ChatResult(generations=[ChatGeneration(message=answer)])
+        # A copy each time: `add_messages` replaces a message that comes back with the same id.
+        return ChatResult(generations=[ChatGeneration(message=answer.model_copy(deep=True))])
 
 
 def tool_call(name: str, args: dict[str, Any], call_id: str) -> AIMessage:

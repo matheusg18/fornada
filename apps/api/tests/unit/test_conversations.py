@@ -7,12 +7,18 @@ from uuid import UUID
 import pytest
 from fastapi.testclient import TestClient
 
-from fornada_api.agents.attendant.attendant import FIXED_REPLY
 from fornada_api.core.config import LogSettings, get_settings
 from fornada_api.core.logging import configure_logging
 from fornada_api.dependencies import get_attendant
 from fornada_api.infrastructure.engine import get_engine, get_sessionmaker
 from fornada_api.main import app
+
+REPLY = "Olá! Aqui é a Fornada."
+
+
+class StubAttendant:
+    async def reply(self, conversation_id: UUID, text: str) -> list[str]:
+        return [REPLY]
 
 
 def clear_caches() -> None:
@@ -32,6 +38,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     handlers, level = root.handlers[:], root.level
     clear_caches()
     with TestClient(app) as client:
+        app.dependency_overrides[get_attendant] = StubAttendant
         yield client
     clear_caches()
     app.dependency_overrides.clear()
@@ -48,7 +55,7 @@ def test_customer_sends_a_message(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json() == {
         "conversation_id": str(conversation_id),
-        "replies": [{"text": FIXED_REPLY}],
+        "replies": [{"text": REPLY}],
     }
 
 
@@ -63,12 +70,6 @@ def test_id_is_not_a_uuid(client: TestClient) -> None:
 @pytest.mark.parametrize("body", [{}, {"text": "   "}, {"text": ""}, {"text": 42}, ["oi"]])
 def test_invalid_body(client: TestClient, body: object) -> None:
     assert post(client, uuid.uuid4(), body).status_code == 422
-
-
-def test_same_reply_everywhere(client: TestClient) -> None:
-    first = post(client, uuid.uuid4(), {"text": "Quero um bolo para amanhã"}).json()
-    second = post(client, uuid.uuid4(), {"text": "Vocês entregam no Ipsep?"}).json()
-    assert first["replies"] == second["replies"] == [{"text": FIXED_REPLY}]
 
 
 class TwoReplies:
