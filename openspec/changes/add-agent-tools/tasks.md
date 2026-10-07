@@ -26,8 +26,8 @@
 
 ## 5. Repositories (`bakery-rules`, `agent-tools`)
 
-- [ ] 5.1 Add the integration-test fixture from the design: a sessionmaker bound to a connection in an outer transaction with `join_transaction_mode="create_savepoint"`, rolled back after each test; verify a test that inserts a sent message and commits leaves no row afterwards
-- [ ] 5.2 Implement the repositories (catalog, capacity, customers, orders, coupons, side effects) satisfying the service protocols, with `selectinload` where services read relations; add integration tests against the seed: 12 active products with allergens, 3 pans, 8 neighborhoods, used kg on run day + 3 is `15.0` and on + 5 is `13.0`, Dec 25 override has capacity 0, `PRIMEIRA10` usage equals its limit, an order loads by id with its customer; verify `uv run task test:integration` passes
+- [x] 5.1 Add the integration-test fixture from the design: a sessionmaker bound to a connection in an outer transaction with `join_transaction_mode="create_savepoint"`, rolled back after each test; verify a test that inserts a sent message and commits leaves no row afterwards
+- [x] 5.2 Implement the repositories (catalog, capacity, customers, orders, coupons, side effects) satisfying the service protocols, with `selectinload` where services read relations; add integration tests against the seed: 12 active products with allergens, 3 pans, 8 neighborhoods, used kg on run day + 3 is `15.0` and on + 5 is `13.0`, Dec 25 override has capacity 0, `PRIMEIRA10` usage equals its limit, an order loads by id with its customer; verify `uv run task test:integration` passes
 
 ## 6. Tools (`agent-tools`)
 
