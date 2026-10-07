@@ -1,6 +1,6 @@
 {
   "env": {
-    "PLAYWRIGHT_MCP_NO_SANDBOX": "1"
+    "PLAYWRIGHT_MCP_SANDBOX": "false"
   },
   "enabledPlugins": {
     "langchain-skills@langchain-skills": true,
