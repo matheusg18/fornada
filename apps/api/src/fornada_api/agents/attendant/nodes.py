@@ -1,6 +1,6 @@
 """The graph's nodes: the model call and the tool runner."""
 
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Sequence
 from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -14,9 +14,7 @@ from fornada_api.agents.attendant.state import AttendantState
 PROMPT_VERSION_KEY = "prompt_version"
 
 
-def make_call_model(
-    model: BaseChatModel | Any, prompt: SystemPrompt
-) -> Callable[[AttendantState], Awaitable[dict[str, Any]]]:
+def make_call_model(model: BaseChatModel | Any, prompt: SystemPrompt):
     """The model node. `model` must already have the tools bound.
 
     The system prompt goes first in every call and is never returned, so it is
