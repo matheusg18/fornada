@@ -2,7 +2,7 @@
 
 ## 1. Workspace on Python 3.13
 
-- [ ] 1.1 Set `.python-version` to `3.13`, `requires-python = ">=3.13"` in both apps, `fornada-api` ruff `target-version = "py313"` and pyright `pythonVersion = "3.13"`; rewrite `except SQLAlchemyError, OSError:` in `apps/api/src/fornada_api/health.py` as `except (SQLAlchemyError, OSError):`; add `from __future__ import annotations` to the `catalog`, `orders` and `customers` models (their forward references relied on 3.14's deferred annotations); run `uv sync` at the root and verify `uv run python --version` reports 3.13 and `uv run task check` in `apps/api` passes
+- [x] 1.1 Set `.python-version` to `3.13`, `requires-python = ">=3.13"` in both apps, `fornada-api` ruff `target-version = "py313"` and pyright `pythonVersion = "3.13"`; rewrite `except SQLAlchemyError, OSError:` in `apps/api/src/fornada_api/health.py` as `except (SQLAlchemyError, OSError):`; add `from __future__ import annotations` to the `catalog`, `orders` and `customers` models (their forward references relied on 3.14's deferred annotations); run `uv sync` at the root and verify `uv run python --version` reports 3.13 and `uv run task check` in `apps/api` passes
 
 ## 2. Chat app scaffolding
 
