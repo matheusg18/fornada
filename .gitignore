@@ -14,6 +14,10 @@ build/
 # Node (agent tooling, e.g. OpenSpec via npx)
 node_modules/
 
+# Chainlit (generated on start; config.toml and chainlit.md are versioned)
+apps/chat/.files/
+apps/chat/.chainlit/translations/
+
 # Environment and secrets
 .env
 .env.*
@@ -21,6 +25,9 @@ node_modules/
 
 # Claude Code: personal settings, not versioned
 .claude/settings.local.json
+
+# Playwright MCP output (snapshots, console logs, screenshots)
+.playwright-mcp/
 
 # Editor / SO
 .vscode/
