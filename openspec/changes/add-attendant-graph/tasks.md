@@ -36,7 +36,7 @@
 
 - [x] 6.1 Run `uv run task check` in `apps/api` and verify it passes
 - [x] 6.2 With a real API key in `.env`, start `uv run task dev` and hold a short conversation over `curl` on one conversation id (ask for the catalog, then a quote for 2.5 kg of `bolo-chocolate` delivered to Ipsep); verify the replies use the tools (quote total `234.75`), the second message remembers the first, the startup log shows the prompt version, and `SELECT checkpoint->'channel_values'->>'prompt_version' FROM checkpoints WHERE thread_id = '<id>' ORDER BY checkpoint_id DESC LIMIT 1` (or `aget_state`) returns the same version
-- [ ] 6.3 Send one message from the Chainlit chat (`apps/chat`) and verify an agent reply appears
+- [x] 6.3 Send one message from the Chainlit chat (`apps/chat`) and verify an agent reply appears
 
 ## Workflow follow-up
 
