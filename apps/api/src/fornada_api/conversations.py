@@ -8,7 +8,7 @@ import logging
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, StringConstraints
 
 from fornada_api.dependencies import AttendantDep
@@ -40,7 +40,12 @@ async def send_message(
         "conversation turn",
         extra={"conversation_id": str(conversation_id), "text_length": len(message.text)},
     )
-    replies = await attendant.reply(conversation_id, message.text)
+    try:
+        replies = await attendant.reply(conversation_id, message.text)
+    except Exception:
+        # Provider and driver errors can carry hosts, ids or keys: log, never return.
+        logger.exception("turn failed", extra={"conversation_id": str(conversation_id)})
+        raise HTTPException(status_code=503, detail="attendant unavailable") from None
     return TurnOut(
         conversation_id=conversation_id,
         replies=[Reply(text=reply) for reply in replies],

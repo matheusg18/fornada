@@ -96,3 +96,27 @@ def test_turn_is_logged_without_the_text(
     assert turns[0]["conversation_id"] == str(conversation_id)
     assert turns[0]["text_length"] == 26
     assert not [line for line in lines if "81987654321" in line]
+
+
+class FailingAttendant:
+    async def reply(self, conversation_id: UUID, text: str) -> list[str]:
+        raise RuntimeError(
+            "connection to postgresql://fornada:s3cret@db:5432 failed, key sk-ant-test"
+        )
+
+
+def test_failed_turn_returns_503_without_details(
+    client: TestClient, capsys: pytest.CaptureFixture[str]
+) -> None:
+    configure_logging(LogSettings(level="INFO"))
+    app.dependency_overrides[get_attendant] = FailingAttendant
+    conversation_id = uuid.uuid4()
+    response = post(client, conversation_id, {"text": "Meu telefone é 81987654321"})
+    assert response.status_code == 503
+    for secret in ("s3cret", "sk-ant-test", "db:5432"):
+        assert secret not in response.text
+    lines = capsys.readouterr().out.splitlines()
+    failures = [r for r in map(json.loads, lines) if r["message"] == "turn failed"]
+    assert len(failures) == 1
+    assert failures[0]["conversation_id"] == str(conversation_id)
+    assert not [line for line in lines if "81987654321" in line]
