@@ -23,7 +23,7 @@
 ## 5. Integration check
 
 - [x] 5.1 Run `uv run task check` in both `apps/api` and `apps/chat` and verify both pass
-- [ ] 5.2 With the API on `uv run task dev` (port 8000) and the chat on `uv run task dev` (port 8001), drive `http://localhost:8001` with the Playwright MCP: verify there is no attach-file control, a message gets the API's fixed reply, there is no edit control on the sent message, the API's `conversation turn` log shows the same `conversation_id` for two messages in one session and a different one after "New chat"; stop the API and verify the error message appears; restart it and verify the next message in the same session gets the reply under the same id
+- [x] 5.2 With the API on `uv run task dev` (port 8000) and the chat on `uv run task dev` (port 8001), drive `http://localhost:8001` with the Playwright MCP: verify there is no attach-file control, a message gets the API's fixed reply, there is no edit control on the sent message, the API's `conversation turn` log shows the same `conversation_id` for two messages in one session and a different one after "New chat"; stop the API and verify the error message appears; restart it and verify the next message in the same session gets the reply under the same id
 
 ## Workflow follow-up
 

@@ -26,6 +26,9 @@ apps/chat/.chainlit/translations/
 # Claude Code: personal settings, not versioned
 .claude/settings.local.json
 
+# Playwright MCP output (snapshots, console logs, screenshots)
+.playwright-mcp/
+
 # Editor / SO
 .vscode/
 .idea/
