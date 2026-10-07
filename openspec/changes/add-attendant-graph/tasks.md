@@ -7,8 +7,8 @@
 ## 2. Versioned system prompt (`prompt-versioning`)
 
 - [x] 2.1 Add `agents/attendant/prompts/system.md` with the naive one-screen pt-BR v0 prompt (design Decision 11: role, what it helps with, use the tools, ask for what is missing, brief and friendly; no security rules, allergen disclaimers or date) and stop for the maintainer to review the text before going on; verify the file is under `src/fornada_api/agents/attendant/prompts/`
-- [ ] 2.2 Add `agents/attendant/prompt.py` with the frozen `SystemPrompt(text, version)` and `load_system_prompt()` (read via `importlib.resources`, normalize `\r\n` to `\n`, `version = "sha256:" + sha256[:12]`), accepting an optional source for tests; add `tests/unit/agents/test_prompt.py` covering: text equals the file, same content → same version, one changed character → different version, `\r\n` vs `\n` → same version, version matches `hashlib.sha256` of the committed file, format `^sha256:[0-9a-f]{12}$`; verify `uv run task test:unit` passes
-- [ ] 2.3 Verify the prompt ships in the built package: `uv build --package fornada-api` and list the wheel, checking `fornada_api/agents/attendant/prompts/system.md` is inside
+- [x] 2.2 Add `agents/attendant/prompt.py` with the frozen `SystemPrompt(text, version)` and `load_system_prompt()` (read via `importlib.resources`, normalize `\r\n` to `\n`, `version = "sha256:" + sha256[:12]`), accepting an optional source for tests; add `tests/unit/agents/test_prompt.py` covering: text equals the file, same content → same version, one changed character → different version, `\r\n` vs `\n` → same version, version matches `hashlib.sha256` of the committed file, format `^sha256:[0-9a-f]{12}$`; verify `uv run task test:unit` passes
+- [x] 2.3 Verify the prompt ships in the built package: `uv build --package fornada-api` and list the wheel, checking `fornada_api/agents/attendant/prompts/system.md` is inside
 
 ## 3. State, nodes, routing and graph (`attendant-agent`)
 
