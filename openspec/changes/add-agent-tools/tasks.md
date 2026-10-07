@@ -2,9 +2,9 @@
 
 ## 1. Setup and settings (`app-config`)
 
-- [ ] 1.1 Run `uv add --package fornada-api langgraph` from the repo root, after checking its latest version and the current `ToolRuntime`/`ToolException` docs; verify `uv run --package fornada-api python -c "from langchain_core.tools import tool, ToolException; from langgraph.prebuilt import ToolNode"` works
-- [ ] 1.2 Add `daily_capacity_kg: Decimal` (`gt=0`, default `15`) to `AppSettings`, list `APP__DAILY_CAPACITY_KG` in `.env.example` and the `apps/api/README.md` configuration section; add unit tests for the default (exactly `Decimal("15")`), `20.5`, and `0` failing with an error naming `APP__DAILY_CAPACITY_KG`; verify `uv run task test:unit` passes
-- [ ] 1.3 Create the empty packages `repositories/`, `services/`, `agents/` and `agents/attendant/` (each with `__init__.py`) and matching `tests/unit/services/` and `tests/integration/{repositories,agents}/` folders; verify `uv run task check` passes
+- [x] 1.1 Run `uv add --package fornada-api langgraph` from the repo root, after checking its latest version and the current `ToolRuntime`/`ToolException` docs; verify `uv run --package fornada-api python -c "from langchain_core.tools import tool, ToolException; from langgraph.prebuilt import ToolNode"` works
+- [x] 1.2 Add `daily_capacity_kg: Decimal` (`gt=0`, default `15`) to `AppSettings`, list `APP__DAILY_CAPACITY_KG` in `.env.example` and the `apps/api/README.md` configuration section; add unit tests for the default (exactly `Decimal("15")`), `20.5`, and `0` failing with an error naming `APP__DAILY_CAPACITY_KG`; verify `uv run task test:unit` passes
+- [x] 1.3 Create the empty packages `repositories/`, `services/`, `agents/` and `agents/attendant/` (each with `__init__.py`) and matching `tests/unit/services/` and `tests/integration/{repositories,agents}/` folders; verify `uv run task check` passes
 
 ## 2. Service foundations (`bakery-rules`)
 

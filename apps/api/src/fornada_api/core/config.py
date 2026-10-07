@@ -4,6 +4,7 @@ Settings are grouped into namespaces. A nested value is addressed in the
 environment with a double underscore: `LLM__ANTHROPIC__API_KEY`.
 """
 
+from decimal import Decimal
 from functools import cache
 from typing import Any, Literal, Self
 from zoneinfo import ZoneInfo
@@ -57,6 +58,8 @@ class LlmSettings(BaseModel):
 
 class AppSettings(BaseModel):
     timezone: ZoneInfo = ZoneInfo("America/Sao_Paulo")
+    # Oven capacity for dates without a row in `capacity_overrides`.
+    daily_capacity_kg: Decimal = Field(default=Decimal("15"), gt=0)
 
 
 class LogSettings(BaseModel):

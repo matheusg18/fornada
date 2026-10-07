@@ -1,4 +1,5 @@
 import traceback
+from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -179,6 +180,29 @@ def test_default_timezone(with_key: None) -> None:
 def test_invalid_timezone(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("APP__TIMEZONE", "Mars/Olympus")
     with pytest.raises(ConfigError, match="APP__TIMEZONE"):
+        load()
+
+
+# --- daily capacity ------------------------------------------------------------
+
+
+def test_default_daily_capacity(with_key: None) -> None:
+    capacity = load().app.daily_capacity_kg
+    assert isinstance(capacity, Decimal)
+    assert capacity == Decimal("15")
+
+
+def test_daily_capacity_override(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP__DAILY_CAPACITY_KG", "20.5")
+    assert load().app.daily_capacity_kg == Decimal("20.5")
+
+
+@pytest.mark.parametrize("value", ["0", "-3", "lots"])
+def test_invalid_daily_capacity(
+    value: str, with_key: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("APP__DAILY_CAPACITY_KG", value)
+    with pytest.raises(ConfigError, match="APP__DAILY_CAPACITY_KG"):
         load()
 
 

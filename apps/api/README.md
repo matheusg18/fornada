@@ -17,6 +17,7 @@ Nested settings use a double underscore, `NAMESPACE__FIELD`:
 | `LLM__ANTHROPIC__API_KEY` / `LLM__ANTHROPIC__MODEL` | – / `claude-haiku-4-5` | Required when Anthropic is active |
 | `LLM__OPENAI__API_KEY` / `LLM__OPENAI__MODEL` | – / `gpt-5-mini` | Required when OpenAI is active |
 | `APP__TIMEZONE` | `America/Sao_Paulo` | IANA time zone for "now" and dates |
+| `APP__DAILY_CAPACITY_KG` | `15` | Oven capacity in kg for dates without a capacity override; must be > 0 |
 | `LOG__LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` or `CRITICAL` |
 | `DB__URL` | – (required) | PostgreSQL URL (`postgresql://…`); in the dev container, the value of `$DATABASE_URI` |
 
