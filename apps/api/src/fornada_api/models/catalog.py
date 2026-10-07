@@ -35,9 +35,7 @@ class ProductAllergen(Base):
     __tablename__ = "product_allergens"
 
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), primary_key=True)
-    allergen_code: Mapped[str] = mapped_column(
-        ForeignKey("allergens.code"), primary_key=True
-    )
+    allergen_code: Mapped[str] = mapped_column(ForeignKey("allergens.code"), primary_key=True)
     kind: Mapped[AllergenKind]
 
     product: Mapped[Product] = relationship(back_populates="allergen_links", lazy="raise")

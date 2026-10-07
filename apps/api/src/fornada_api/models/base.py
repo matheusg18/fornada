@@ -4,9 +4,11 @@ the only source of DDL: nothing here creates or alters tables."""
 import datetime as dt
 from decimal import Decimal
 from enum import StrEnum
+from typing import Any, ClassVar
 
 from sqlalchemy import DateTime, Enum, Numeric, Text
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.types import TypeEngine
 
 from fornada_api.models.enums import AllergenKind, Fulfillment, OrderStatus
 
@@ -23,7 +25,7 @@ def _text_enum(enum_cls: type[StrEnum]) -> Enum:
 
 
 class Base(DeclarativeBase):
-    type_annotation_map = {
+    type_annotation_map: ClassVar[dict[type, TypeEngine[Any]]] = {
         str: Text(),
         Decimal: Numeric(asdecimal=True),
         dt.datetime: DateTime(timezone=True),

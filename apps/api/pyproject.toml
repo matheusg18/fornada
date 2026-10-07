@@ -21,8 +21,46 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "pyright>=1.1.414",
     "pytest>=9.1.1",
+    "ruff>=0.16.10",
+    "taskipy>=1.14.1",
 ]
 
 [tool.fastapi]
 entrypoint = "fornada_api.main:app"
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "ASYNC", "RUF"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.14"
+typeCheckingMode = "standard"
+venvPath = "../.."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --import-mode=importlib"
+testpaths = ["tests"]
+markers = [
+    "integration: needs the dev container's seeded Postgres (DATABASE_URI)",
+]
+
+# Run from apps/api: `uv run task <name>`. `dev` runs from the repo root so the
+# app finds the root `.env`.
+[tool.taskipy.tasks]
+dev = { cmd = "fastapi dev apps/api/src/fornada_api/main.py", cwd = "../.." }
+test = "pytest"
+"test:unit" = "pytest tests/unit"
+"test:integration" = "pytest tests/integration"
+lint = "ruff check"
+"lint:fix" = "ruff check --fix"
+format = "ruff format"
+"format:check" = "ruff format --check"
+typecheck = "pyright"
+check = "task lint && task format:check && task typecheck && task test"

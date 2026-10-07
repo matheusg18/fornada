@@ -27,15 +27,16 @@ Logs are JSON, one object per line on stdout, with `timestamp` (UTC),
 
 ## Running the API
 
-From the repo root, with `.env` filled in:
+Tasks are defined with taskipy in `pyproject.toml`; run them from `apps/api`
+(`uv run task --list` shows them all):
 
 ```bash
-# Development server with auto-reload on http://localhost:8000
-uv run --package fornada-api fastapi dev apps/api/src/fornada_api/main.py
-
-# Same app, no reload
-uv run --package fornada-api fornada-api
+cd apps/api
+uv run task dev      # development server with auto-reload on http://localhost:8000
 ```
+
+`dev` runs from the repo root so the app finds `.env`. To serve without
+reload, from the root: `uv run --package fornada-api fornada-api`.
 
 - `GET /docs`: OpenAPI UI.
 - `GET /health/db`: loads every model and returns the row count per table
@@ -51,12 +52,19 @@ session factory; path operations get a session with `DbSessionDep` from
 `fornada_api/dependencies`. Sessions never commit on their own. Relationships
 are `lazy="raise"`: load them explicitly with `selectinload`/`joinedload`.
 
-## Tests
+## Checks and tests
 
-```bash
-uv run --package fornada-api pytest                 # everything
-uv run --package fornada-api pytest -m "not integration"
-```
+From `apps/api`:
+
+| Task | What it runs |
+|---|---|
+| `uv run task check` | Everything below: lint, format check, type check and all tests |
+| `uv run task lint` / `lint:fix` | `ruff check` (with `--fix`) |
+| `uv run task format` / `format:check` | `ruff format` (with `--check`) |
+| `uv run task typecheck` | `pyright` (standard mode) |
+| `uv run task test` | All tests |
+| `uv run task test:unit` | `tests/unit` |
+| `uv run task test:integration` | `tests/integration` |
 
 Integration tests (`tests/integration/`) use the dev container's seeded
 database through `DATABASE_URI` and are skipped when it is not set. They never
