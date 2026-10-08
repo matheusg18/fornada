@@ -8,7 +8,7 @@
 
 ## 2. Settings (`persona-simulator`: batches, missing key)
 
-- [ ] 2.1 Add `fornada_simulator/settings.py` (`SimulatorSettings`: provider, per-provider model and key, `api_url` default `http://localhost:8000`, `max_turns` 12, `concurrency` 1, `runs_per_persona` 4; `ConfigError` naming variables without echoing keys) and `tests/unit/test_settings.py`: defaults, overrides, missing key error names the variable and never contains the key; verify `uv run task test` passes
+- [x] 2.1 Add `fornada_simulator/settings.py` (`SimulatorSettings`: provider, per-provider model and key, `api_url` default `http://localhost:8000`, `max_turns` 12, `concurrency` 1, `runs_per_persona` 4; `ConfigError` naming variables without echoing keys) and `tests/unit/test_settings.py`: defaults, overrides, missing key error names the variable and never contains the key; verify `uv run task test` passes
 
 ## 3. Personas (`persona-simulator`: five personas)
 
