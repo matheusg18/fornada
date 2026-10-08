@@ -2,9 +2,9 @@
 
 ## 1. Simulator app scaffolding
 
-- [ ] 1.1 Create the member with `uv init --package apps/simulator` (name `fornada-simulator`); add `httpx`, `langchain-anthropic`, `langchain-openai`, `pydantic-settings` with `uv add --package fornada-simulator`, the dev group (`ruff`, `pyright`, `pytest`, `taskipy`) with `--dev`, and `ipykernel`, `pandas` with `--group notebook`; verify `uv sync` resolves
-- [ ] 1.2 Configure ruff, pyright and pytest in `apps/simulator/pyproject.toml` like `apps/chat` (py313, `--import-mode=importlib`), add taskipy tasks `test`, `lint`, `lint:fix`, `format`, `format:check`, `typecheck`, `check` and `batch` (runs a default batch from a module entry point); drop the placeholder script; verify `uv run task --list` shows them
-- [ ] 1.3 Add `apps/simulator/runs/` to `.gitignore` and a "Simulator" section with commented `SIMULATOR__*` variables to the root `.env.example`
+- [x] 1.1 Create the member with `uv init --package apps/simulator` (name `fornada-simulator`); add `httpx`, `langchain-anthropic`, `langchain-openai`, `pydantic-settings` with `uv add --package fornada-simulator`, the dev group (`ruff`, `pyright`, `pytest`, `taskipy`) with `--dev`, and `ipykernel`, `pandas` with `--group notebook`; verify `uv sync` resolves
+- [x] 1.2 Configure ruff, pyright and pytest in `apps/simulator/pyproject.toml` like `apps/chat` (py313, `--import-mode=importlib`), add taskipy tasks `test`, `lint`, `lint:fix`, `format`, `format:check`, `typecheck`, `check` and `batch` (runs a default batch from a module entry point); drop the placeholder script; verify `uv run task --list` shows them
+- [x] 1.3 Add `apps/simulator/runs/` to `.gitignore` and a "Simulator" section with commented `SIMULATOR__*` variables to the root `.env.example`
 
 ## 2. Settings (`persona-simulator`: batches, missing key)
 

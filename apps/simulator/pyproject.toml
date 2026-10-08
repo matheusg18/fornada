@@ -1,0 +1,61 @@
+[project]
+name = "fornada-simulator"
+version = "0.1.0"
+description = "Fornada simulator: LLM personas that play customers against the API, driven from a notebook"
+readme = "README.md"
+authors = [
+    { name = "Matheus Santos", email = "matheusgabriel.18@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28.1",
+    "langchain-anthropic>=1.7.5",
+    "langchain-openai>=1.6.7",
+    "pydantic-settings>=2.15.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.23,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.414",
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+    "taskipy>=1.14.1",
+]
+notebook = [
+    "ipykernel>=7.4.0",
+    "pandas>=3.0.6",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "ASYNC", "RUF"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.13"
+typeCheckingMode = "standard"
+venvPath = "../.."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --import-mode=importlib"
+testpaths = ["tests"]
+
+# Run from apps/simulator: `uv run task <name>`. `batch` runs from the repo root
+# so the app finds the root `.env`.
+[tool.taskipy.tasks]
+batch = { cmd = "python -m fornada_simulator", cwd = "../.." }
+test = "pytest"
+lint = "ruff check"
+"lint:fix" = "ruff check --fix"
+format = "ruff format"
+"format:check" = "ruff format --check"
+typecheck = "pyright"
+check = "task lint && task format:check && task typecheck && task test"
