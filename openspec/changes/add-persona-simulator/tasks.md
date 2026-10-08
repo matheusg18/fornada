@@ -23,9 +23,9 @@
 
 ## 5. Running conversations (`persona-simulator`: ends, replies reach the persona)
 
-- [ ] 5.1 Add the persona system-prompt builder and `fornada_simulator/model.py` (provider factory from settings, temperature above 0), and `fornada_simulator/simulate.py::run_conversation` with the `[FIM]` marker, role inversion and the `completed`, `max_turns`, `api_error` and `simulator_error` outcomes
-- [ ] 5.2 Add `tests/unit/test_simulate.py` with a scripted fake chat model and `MockTransport`: first message posted under a new UUID4, two replies reach the persona in order, `[FIM]` ends with `completed` and is not posted, a never-ending persona stops at the cap with `max_turns`, a 503 on turn 3 gives `api_error` with two turns kept, a fake model raising on turn 2 gives `simulator_error` with one turn kept, and a log-capture test shows no message text in log records; verify the tests pass
-- [ ] 5.3 Add `run_batch` (even planning, goals in order, `asyncio.Semaphore`, appends each transcript to `runs/<run_id>.jsonl` as it finishes, one failing conversation never stops the batch) and tests: 20 planned jobs, four per persona with distinct goals, a failing conversation still leaves 20 lines; verify the tests pass
+- [x] 5.1 Add the persona system-prompt builder and `fornada_simulator/model.py` (provider factory from settings, temperature above 0), and `fornada_simulator/simulate.py::run_conversation` with the `[FIM]` marker, role inversion and the `completed`, `max_turns`, `api_error` and `simulator_error` outcomes
+- [x] 5.2 Add `tests/unit/test_simulate.py` with a scripted fake chat model and `MockTransport`: first message posted under a new UUID4, two replies reach the persona in order, `[FIM]` ends with `completed` and is not posted, a never-ending persona stops at the cap with `max_turns`, a 503 on turn 3 gives `api_error` with two turns kept, a fake model raising on turn 2 gives `simulator_error` with one turn kept, and a log-capture test shows no message text in log records; verify the tests pass
+- [x] 5.3 Add `run_batch` (even planning, goals in order, `asyncio.Semaphore`, appends each transcript to `runs/<run_id>.jsonl` as it finishes, one failing conversation never stops the batch) and tests: 20 planned jobs, four per persona with distinct goals, a failing conversation still leaves 20 lines; verify the tests pass
 
 ## 6. Summary and notebook (`persona-simulator`: notebook)
 
