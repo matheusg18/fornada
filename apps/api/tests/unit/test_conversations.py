@@ -7,12 +7,18 @@ from uuid import UUID
 import pytest
 from fastapi.testclient import TestClient
 
-from fornada_api.agents.attendant.attendant import FIXED_REPLY
 from fornada_api.core.config import LogSettings, get_settings
 from fornada_api.core.logging import configure_logging
 from fornada_api.dependencies import get_attendant
 from fornada_api.infrastructure.engine import get_engine, get_sessionmaker
 from fornada_api.main import app
+
+REPLY = "Olá! Aqui é a Fornada."
+
+
+class StubAttendant:
+    async def reply(self, conversation_id: UUID, text: str) -> list[str]:
+        return [REPLY]
 
 
 def clear_caches() -> None:
@@ -32,6 +38,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     handlers, level = root.handlers[:], root.level
     clear_caches()
     with TestClient(app) as client:
+        app.dependency_overrides[get_attendant] = StubAttendant
         yield client
     clear_caches()
     app.dependency_overrides.clear()
@@ -48,7 +55,7 @@ def test_customer_sends_a_message(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json() == {
         "conversation_id": str(conversation_id),
-        "replies": [{"text": FIXED_REPLY}],
+        "replies": [{"text": REPLY}],
     }
 
 
@@ -63,12 +70,6 @@ def test_id_is_not_a_uuid(client: TestClient) -> None:
 @pytest.mark.parametrize("body", [{}, {"text": "   "}, {"text": ""}, {"text": 42}, ["oi"]])
 def test_invalid_body(client: TestClient, body: object) -> None:
     assert post(client, uuid.uuid4(), body).status_code == 422
-
-
-def test_same_reply_everywhere(client: TestClient) -> None:
-    first = post(client, uuid.uuid4(), {"text": "Quero um bolo para amanhã"}).json()
-    second = post(client, uuid.uuid4(), {"text": "Vocês entregam no Ipsep?"}).json()
-    assert first["replies"] == second["replies"] == [{"text": FIXED_REPLY}]
 
 
 class TwoReplies:
@@ -94,4 +95,28 @@ def test_turn_is_logged_without_the_text(
     assert len(turns) == 1
     assert turns[0]["conversation_id"] == str(conversation_id)
     assert turns[0]["text_length"] == 26
+    assert not [line for line in lines if "81987654321" in line]
+
+
+class FailingAttendant:
+    async def reply(self, conversation_id: UUID, text: str) -> list[str]:
+        raise RuntimeError(
+            "connection to postgresql://fornada:s3cret@db:5432 failed, key sk-ant-test"
+        )
+
+
+def test_failed_turn_returns_503_without_details(
+    client: TestClient, capsys: pytest.CaptureFixture[str]
+) -> None:
+    configure_logging(LogSettings(level="INFO"))
+    app.dependency_overrides[get_attendant] = FailingAttendant
+    conversation_id = uuid.uuid4()
+    response = post(client, conversation_id, {"text": "Meu telefone é 81987654321"})
+    assert response.status_code == 503
+    for secret in ("s3cret", "sk-ant-test", "db:5432"):
+        assert secret not in response.text
+    lines = capsys.readouterr().out.splitlines()
+    failures = [r for r in map(json.loads, lines) if r["message"] == "turn failed"]
+    assert len(failures) == 1
+    assert failures[0]["conversation_id"] == str(conversation_id)
     assert not [line for line in lines if "81987654321" in line]

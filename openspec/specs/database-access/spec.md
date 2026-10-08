@@ -18,11 +18,15 @@ The API SHALL have one model for each app table in the schema script: products, 
 - **THEN** no load fails and the number of rows loaded equals the table's row count
 
 ### Requirement: Models never change the schema
-The schema script SHALL remain the only source of table definitions. Starting the API or importing the models SHALL NOT create, alter or drop any table.
+The schema script SHALL remain the only source of app table definitions. Starting the API or importing the models SHALL NOT create, alter or drop any app table. The LangGraph checkpointer's tables are the one exception: the checkpointer library creates and migrates them in the same database, and SHALL NOT touch any app table.
 
 #### Scenario: Startup against the seeded database
 - **WHEN** the API starts and stops against the seeded database
-- **THEN** the set of tables and their columns is unchanged
+- **THEN** the set of app tables and their columns is unchanged
+
+#### Scenario: Checkpointer tables
+- **WHEN** the first conversation turn runs against a database without checkpointer tables
+- **THEN** the checkpointer's tables exist afterwards, and the app tables and their columns are unchanged
 
 ### Requirement: Money and weights load as exact decimals
 Monetary amounts and weights SHALL load as exact decimal values, never as floating point.
