@@ -18,8 +18,8 @@
 
 ## 4. API client and transcripts (`persona-simulator`: talks to the API, JSONL)
 
-- [ ] 4.1 Add `fornada_simulator/client.py` (`send_message`, `ApiError` kinds `timeout`, `connect`, `status`, `bad_body`) and `tests/unit/test_client.py` with `httpx.MockTransport` and `pytest.mark.anyio`: path and body, replies in order, each failure kind; verify the tests pass
-- [ ] 4.2 Add `fornada_simulator/transcript.py` (`Message`, `Transcript`, `append_jsonl`) and `tests/unit/test_transcript.py`: one parseable JSON line per transcript with every required field, appending twice yields two lines; verify the tests pass
+- [x] 4.1 Add `fornada_simulator/client.py` (`send_message`, `ApiError` kinds `timeout`, `connect`, `status`, `bad_body`) and `tests/unit/test_client.py` with `httpx.MockTransport` and `pytest.mark.anyio`: path and body, replies in order, each failure kind; verify the tests pass
+- [x] 4.2 Add `fornada_simulator/transcript.py` (`Message`, `Transcript`, `append_jsonl`) and `tests/unit/test_transcript.py`: one parseable JSON line per transcript with every required field, appending twice yields two lines; verify the tests pass
 
 ## 5. Running conversations (`persona-simulator`: ends, replies reach the persona)
 
