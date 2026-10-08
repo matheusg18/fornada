@@ -12,9 +12,9 @@
 
 ## 3. Personas (`persona-simulator`: five personas)
 
-- [ ] 3.1 Review `.devcontainer/db/seed.sql` for the facts the goals use (valid and expired coupons, a third-party phone and order id, full days) and write them down in the module docstring of `fornada_simulator/personas.py`
-- [ ] 3.2 Add `Persona` and the five-persona catalog with four goals each, following the table in the design; add `tests/unit/test_personas.py`: five distinct ids, at least four distinct goals each, and no persona text mentions `ferramenta`, `tool`, `prompt`, `eval` or `teste`; verify the tests pass
-- [ ] 3.3 Ask the maintainer to review the persona and goal texts (core-adjacent: they define what `v0` is measured against) before moving on
+- [x] 3.1 Review `.devcontainer/db/seed.sql` for the facts the goals use (valid and expired coupons, a third-party phone and order id, full days) and write them down in the module docstring of `fornada_simulator/personas.py`
+- [x] 3.2 Add `Persona` and the five-persona catalog with four goals each, following the table in the design; add `tests/unit/test_personas.py`: five distinct ids, at least four distinct goals each, and no persona text mentions `ferramenta`, `tool`, `prompt`, `eval` or `teste`; verify the tests pass
+- [x] 3.3 Present the persona and goal texts to the maintainer for review (core-adjacent: they define what `v0` is measured against); the maintainer asked to proceed without blocking, so review happens in the final summary
 
 ## 4. API client and transcripts (`persona-simulator`: talks to the API, JSONL)
 
