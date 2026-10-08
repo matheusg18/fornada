@@ -29,9 +29,9 @@
 
 ## 6. Summary and notebook (`persona-simulator`: notebook)
 
-- [ ] 6.1 Add `fornada_simulator/summary.py` (per-persona conversations, outcome counts, average customer turns and seconds from a list of transcripts) with a unit test on a hand-made list
-- [ ] 6.2 Create `notebooks/simulator.ipynb` with cells to: describe the setup and check the API is up; show the personas as a table; run one conversation and print it turn by turn; run the default batch; show the per-persona summary table; show how to load an earlier `runs/*.jsonl`. Keep cells thin (imports from the package) and clear outputs before saving
-- [ ] 6.3 Document the app in `apps/simulator/README.md` (what it is, how to start the API and open the notebook in VS Code, `SIMULATOR__*` variables, runs folder, goals tied to seed facts)
+- [x] 6.1 Add `fornada_simulator/summary.py` (per-persona conversations, outcome counts, average customer turns and seconds from a list of transcripts) with a unit test on a hand-made list
+- [x] 6.2 Create `notebooks/simulator.ipynb` with cells to: describe the setup and check the API is up; show the personas as a table; run one conversation and print it turn by turn; run the default batch; show the per-persona summary table; show how to load an earlier `runs/*.jsonl`. Keep cells thin (imports from the package) and clear outputs before saving
+- [x] 6.3 Document the app in `apps/simulator/README.md` (what it is, how to start the API and open the notebook in VS Code, `SIMULATOR__*` variables, runs folder, goals tied to seed facts)
 
 ## 7. Integration check
 
