@@ -33,15 +33,14 @@ The graph shape, the file layout and the input/state/output split were decided b
 agents/attendant/
 ├─ attendant.py      # Attendant protocol + GraphAttendant (FixedAttendant removed)
 ├─ state.py          # InputState, AttendantState, OutputState
-├─ nodes.py          # call_model node factory; the tool node
-├─ edges.py          # route_after_model (the conditional edge)
+├─ nodes.py          # call_model node factory
 ├─ graph.py          # build_graph(model, tools, prompt) -> StateGraph; compile with a checkpointer
 ├─ prompt.py         # SystemPrompt + load_system_prompt()
 ├─ prompts/system.md # the prompt text (pt-BR)
 └─ tools.py          # unchanged
 ```
 
-`edges.py` is a separate file because the router is not a node: it reads the state and returns the next node's name, writes nothing. Keeping it out of `nodes.py` matches the maintainer's "the decision is not really a node" framing and gives phase 6 one place to look for routing rules.
+There is no `edges.py`: the router is LangGraph's prebuilt `tools_condition` (Decision 3). When phase 6 needs its own routing rules, a hand-written router replaces it in `graph.py`.
 
 Alternative rejected: `langchain.agents.create_agent`. It hides the graph, which defeats the purpose (guardrails as explicit nodes, learning the graph API) and pulls in the full `langchain` package.
 
@@ -70,10 +69,10 @@ class AttendantState(InputState, OutputState):
 
 ### 3. Nodes and routing
 
-- **`call_model`** is built by a factory, `make_call_model(model, prompt)`, that closes over the tool-bound chat model and the loaded `SystemPrompt`. The node sends `[SystemMessage(prompt.text), *state["messages"]]`, stamps the answer (Decision 5) and returns `{"messages": [answer], "prompt_version": prompt.version}`. The system message is never returned, so it is never checkpointed.
+- **`call_model`** is built by a factory, `make_call_model(model, tools, prompt)`, that binds `tools` to the chat model once, when the graph is built, and closes over the bound model and the loaded `SystemPrompt`. Binding inside the factory turns "the model must have the tools bound" from a docstring precondition into code, keeps `model` typed as `BaseChatModel`, and lets `build_graph` hand the same tool list to both nodes. The node sends `[SystemMessage(prompt.text), *state["messages"]]`, stamps the answer (Decision 5) and returns `{"messages": [answer], "prompt_version": prompt.version}`. The system message is never returned, so it is never checkpointed.
 - **`tools`** is LangGraph's prebuilt `ToolNode(tools)`. It already runs parallel calls, matches results by `tool_call_id`, turns `ToolException` into error `ToolMessage`s (the tools set `handle_tool_error`) and injects `ToolRuntime` with the run config. Writing our own would duplicate that for no gain.
-- **`route_after_model(state) -> Literal["tools", "__end__"]`** returns `"tools"` when the last message is an `AIMessage` with `tool_calls`, else `END`. Hand-written (three lines) instead of the prebuilt `tools_condition`, so the decision is visible and phase 6 can extend it.
-- Edges: `START → call_model`, `call_model —route_after_model→ {tools, END}`, `tools → call_model`.
+- **Routing** is LangGraph's prebuilt `tools_condition`: `"tools"` when the last message is an `AIMessage` with `tool_calls`, else `END`. A hand-written router would do the same today; phase 6 swaps in its own when it adds routing rules (for example, no sending tools after untrusted content).
+- Edges: `START → call_model`, `call_model —tools_condition→ {tools, END}`, `tools → call_model`.
 
 Alternative rejected: passing the model and prompt through LangGraph's runtime `context`. A closure is simpler to type and test, and nothing needs to vary per invocation today.
 
@@ -116,7 +115,7 @@ class GraphAttendant:
 
 ### 8. Chat model factory
 
-`agents/attendant/model.py`, `build_chat_model(settings.llm) -> BaseChatModel`: `ChatAnthropic(model=..., api_key=...)` or `ChatOpenAI(model=..., api_key=...)` by `provider`. Provider defaults for temperature and retries. `bind_tools(tools)` happens in `graph.py`.
+`agents/attendant/model.py`, `build_chat_model(settings.llm) -> BaseChatModel`: `ChatAnthropic(model=..., api_key=...)` or `ChatOpenAI(model=..., api_key=...)` by `provider`. Provider defaults for temperature and retries. `bind_tools(tools)` happens in `make_call_model`.
 
 Alternative rejected: `init_chat_model` from the `langchain` package. It needs the whole `langchain` distribution for a two-branch `if`, and the explicit classes type-check better.
 

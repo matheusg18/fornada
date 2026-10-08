@@ -12,16 +12,19 @@ from pydantic import Field
 
 
 class ScriptedChatModel(BaseChatModel):
-    """Returns the queued `AIMessage`s in order and records each call's messages."""
+    """Returns the queued `AIMessage`s in order and records each call's messages
+    and the tools it was bound to."""
 
     answers: list[AIMessage]
     calls: list[list[BaseMessage]] = Field(default_factory=list)
+    bound_tools: list[Any] = Field(default_factory=list)
 
     @property
     def _llm_type(self) -> str:
         return "scripted"
 
     def bind_tools(self, tools: Sequence[Any], **kwargs: Any) -> Runnable[Any, Any]:
+        self.bound_tools = list(tools)
         return self
 
     def _generate(

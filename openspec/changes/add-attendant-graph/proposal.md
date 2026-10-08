@@ -14,7 +14,7 @@ The nine tools and the conversation endpoint exist, but the endpoint still answe
   - `call_model` node: sends the system prompt plus the conversation's messages to the chat model bound to the nine tools.
   - `tools` node: runs the tool calls of the last model message.
   - A conditional edge after `call_model`: to `tools` when the model asked for tool calls, otherwise to the end of the turn. It is routing logic, not a node.
-- **Code layout**, one concern per file in `agents/attendant/`: `state.py` (state schemas), `nodes.py` (nodes), `edges.py` (the routing function), `prompt.py` (prompt loading and versioning), `prompts/system.md` (the prompt text), `model.py` (chat model from settings) and `graph.py` (builds and compiles the graph).
+- **Code layout**, one concern per file in `agents/attendant/`: `state.py` (state schemas), `nodes.py` (the model node; the tool node and the router are LangGraph's prebuilt `ToolNode` and `tools_condition`), `prompt.py` (prompt loading and versioning), `prompts/system.md` (the prompt text), `model.py` (chat model from settings) and `graph.py` (builds and compiles the graph).
 - **Three state schemas:** an input schema (what a turn receives), the internal graph state (what nodes read and write) and an output schema (what a turn returns).
 - **Versioned system prompt.** The prompt lives in a Markdown file. Loading it yields the text and a version derived from a hash of the content. The version is written to the graph state and to every model message the prompt produced, so each answer in a conversation's history says which prompt generated it.
 - **Conversation memory.** A PostgreSQL checkpointer (`langgraph-checkpoint-postgres`) keyed by the conversation id as LangGraph `thread_id`, so a conversation continues across turns and API restarts.
@@ -34,7 +34,7 @@ The nine tools and the conversation endpoint exist, but the endpoint still answe
 
 ## Impact
 
-- **Code:** new modules in `apps/api/src/fornada_api/agents/attendant/` (`state.py`, `nodes.py`, `edges.py`, `prompt.py`, `model.py`, `graph.py`, `prompts/system.md`); `attendant.py` gets the graph-backed attendant and loses `FixedAttendant`; a checkpointer module in `infrastructure/`; `dependencies/attendant.py` and `main.py` (lifespan) change; `conversations.py` maps turn failures to 503.
+- **Code:** new modules in `apps/api/src/fornada_api/agents/attendant/` (`state.py`, `nodes.py`, `prompt.py`, `model.py`, `graph.py`, `prompts/system.md`); `attendant.py` gets the graph-backed attendant and loses `FixedAttendant`; a checkpointer module in `infrastructure/`; `dependencies/attendant.py` and `main.py` (lifespan) change; `conversations.py` maps turn failures to 503.
 - **Dependencies:** `langchain-anthropic`, `langchain-openai`, `langgraph-checkpoint-postgres` (with `psycopg-pool`), installed with `uv add --package fornada-api`.
 - **Database:** the checkpointer's tables (`checkpoints`, `checkpoint_blobs`, `checkpoint_writes`, `checkpoint_migrations`) are created in the `fornada` database by the library's own setup. `schema.sql` already leaves them alone.
 - **Cost:** every turn now calls the LLM (Haiku-class by default), at least once per turn and once more per tool round. No cost cap in v0.
