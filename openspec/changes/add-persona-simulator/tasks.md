@@ -36,4 +36,4 @@
 ## 7. Integration check
 
 - [x] 7.1 Run `uv run task check` in `apps/simulator`, `apps/api` and `apps/chat` and verify all pass
-- [ ] 7.2 With the API running (`uv run task dev`), run the notebook end to end against the real agent: 20 conversations finish (every one with a recorded outcome), the JSONL has 20 lines, and the notebook is saved with outputs cleared; report the outcome counts and any persona that drifted
+- [x] 7.2 With the API running (`uv run task dev`), run the notebook end to end against the real agent: 20 conversations finish (every one with a recorded outcome), the JSONL has 20 lines, and the notebook is saved with outputs cleared; report the outcome counts and any persona that drifted (run 2026-10-09 with gpt-5-mini as the simulator and Haiku as the agent: 17 `completed`, 3 `max_turns`; notebook executed headless with 1 run per persona, every cell ran)
