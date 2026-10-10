@@ -33,3 +33,6 @@ apps/chat/.chainlit/translations/
 .vscode/
 .idea/
 .DS_Store
+
+# Persona simulator transcripts (simulated, regenerable)
+apps/simulator/runs/
