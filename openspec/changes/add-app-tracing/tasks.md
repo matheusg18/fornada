@@ -4,8 +4,8 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "`TracerProvider`, samp
 
 ## 1. Dependencies
 
-- [ ] 1.1 Read the FastAPI 0.143.0 release notes, then upgrade with `uv add --package fornada-api "fastapi[standard]" --upgrade-package fastapi` so it resolves the latest release. Verify `uv.lock` has `fastapi` ≥ 0.143.0 and `uv run task check` (in `apps/api`) passes unchanged.
-- [ ] 1.2 Add `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http` and `opentelemetry-instrumentation-httpx` as direct dependencies with `uv add --package fornada-api …`, after checking their latest versions on PyPI (1.45.1, 1.45.1 and 0.66b1 on 2026-10-11). Verify that `uv run python -c "from opentelemetry.instrumentation.httpx import HTTPX2ClientInstrumentor"` succeeds and `uv run task check` passes.
+- [x] 1.1 Read the FastAPI 0.143.0 release notes, then upgrade with `uv add --package fornada-api "fastapi[standard]" --upgrade-package fastapi` so it resolves the latest release. Verify `uv.lock` has `fastapi` ≥ 0.143.0 and `uv run task check` (in `apps/api`) passes unchanged.
+- [x] 1.2 Add `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http` and `opentelemetry-instrumentation-httpx` as direct dependencies with `uv add --package fornada-api …`, after checking their latest versions on PyPI (1.45.1, 1.45.1 and 0.66b1 on 2026-10-11). Verify that `uv run python -c "from opentelemetry.instrumentation.httpx import HTTPX2ClientInstrumentor"` succeeds and `uv run task check` passes.
 
 ## 2. Telemetry settings (`app-config`: namespaces, tracing switch, OTLP endpoint)
 
