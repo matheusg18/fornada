@@ -24,9 +24,9 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "`TracerProvider`, samp
 
 ## 4. Wire tracing into the app (`app-tracing`: switch, server span, flush at shutdown)
 
-- [ ] 4.1 Write failing unit tests for the app: with tracing disabled, starting and stopping the app registers no SDK provider (spec: tracing disabled). With an in-memory SDK provider registered once for the test session, a `TestClient` POST to `/conversations/{id}/messages` yields exactly one SERVER span with method `POST`, route `/conversations/{conversation_id}/messages` and status code, and two posts with different ids share that route and no span name contains an id. Verify they fail where wiring is missing.
-- [ ] 4.2 TODO(human): pass `telemetry={...}` to `FastAPI(...)` in `main.py`: `auto_configure: False` (design.md) plus the maintainer's choice for `operation_spans`, `metrics` and `logs` (core decision 4), with a one-line comment for each choice.
-- [ ] 4.3 TODO(human): call the tracing setup in the lifespan right after `configure_logging`, and shut it down in the `finally` block. The maintainer decides the order relative to `checkpointer.close()` and `engine.dispose()`. Keep `@asynccontextmanager` (design.md: it is not deprecated). Verify the 4.1 tests and `uv run task check` pass.
+- [x] 4.1 Write failing unit tests for the app: with tracing disabled, starting and stopping the app registers no SDK provider (spec: tracing disabled). With an in-memory SDK provider registered once for the test session, a `TestClient` POST to `/conversations/{id}/messages` yields exactly one SERVER span with method `POST`, route `/conversations/{conversation_id}/messages` and status code, and two posts with different ids share that route and no span name contains an id. Verify they fail where wiring is missing.
+- [x] 4.2 TODO(human): pass `telemetry={...}` to `FastAPI(...)` in `main.py`: `auto_configure: False` (design.md) plus the maintainer's choice for `operation_spans`, `metrics` and `logs` (core decision 4), with a one-line comment for each choice.
+- [x] 4.3 TODO(human): call the tracing setup in the lifespan right after `configure_logging`, and shut it down in the `finally` block. The maintainer decides the order relative to `checkpointer.close()` and `engine.dispose()`. Keep `@asynccontextmanager` (design.md: it is not deprecated). Verify the 4.1 tests and `uv run task check` pass.
 
 ## 5. End-to-end check (all `app-tracing` requirements)
 
