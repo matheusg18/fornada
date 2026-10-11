@@ -192,6 +192,10 @@ services:
     image: docker.elastic.co/elastic-agent/elastic-otel-collector:9.5.5
     restart: unless-stopped
     command: ["--config", "/etc/otelcol/config.yaml"]
+    environment:
+      # HTTP Basic credential for the Langfuse exporter, read by the config as
+      # ${env:LANGFUSE_OTLP_AUTH}. Only this service gets it.
+      LANGFUSE_OTLP_AUTH: ${LANGFUSE_OTLP_AUTH:?}
     volumes:
       - ./otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
 
