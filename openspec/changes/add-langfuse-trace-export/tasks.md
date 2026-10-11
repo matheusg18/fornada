@@ -22,11 +22,11 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "the pipelines in the C
 
 ## 4. End-to-end check (all `telemetry-collector` deltas)
 
-- [ ] 4.1 Maintainer predicts in one sentence what the Langfuse trace for one customer message will look like (how many observations, which is the root, what the name is). Then, with `TELEMETRY__ENABLED=true`, `uv run task dev` and a POST to `/conversations/<uuid>/messages`: Langfuse (http://localhost:3000, project Fornada → Tracing) shows the trace with the SERVER span as root and its children. This is the "Pronto quando". Compare with the prediction.
-- [ ] 4.2 Agent, in the dev container: before and after 4.1, `curl -s edot-collector:8888/metrics | grep -E '^otelcol_exporter_(sent|send_failed)_spans'` shows `sent_spans` for `otlphttp/langfuse` going up by the request's span count and `send_failed_spans` unchanged. Paste both readings in the step summary.
-- [ ] 4.3 Secret hygiene: `git grep` finds neither the secret key nor the encoded value, and `env | grep -i langfuse` in the `dev` container prints nothing. Record the result.
-- [ ] 4.4 Outage: maintainer stops `langfuse-web` on the host, agent posts a message. The reply is normal and `otelcol_receiver_accepted_spans` still grows. Restart `langfuse-web` and record what happened to the spans sent while it was down (retried and delivered, or dropped).
-- [ ] 4.5 Maintainer runs the `telemetrygen` smoke test from the host; its traces appear in Langfuse with `service.name=telemetrygen`.
+- [x] 4.1 Maintainer predicts in one sentence what the Langfuse trace for one customer message will look like (how many observations, which is the root, what the name is). Then, with `TELEMETRY__ENABLED=true`, `uv run task dev` and a POST to `/conversations/<uuid>/messages`: Langfuse (http://localhost:3000, project Fornada → Tracing) shows the trace with the SERVER span as root and its children. This is the "Pronto quando". Compare with the prediction.
+- [x] 4.2 Agent, in the dev container: before and after 4.1, `curl -s edot-collector:8888/metrics | grep -E '^otelcol_exporter_(sent|send_failed)_spans'` shows `sent_spans` for `otlphttp/langfuse` going up by the request's span count and `send_failed_spans` unchanged. Paste both readings in the step summary.
+- [x] 4.3 Secret hygiene: `git grep` finds neither the secret key nor the encoded value, and `env | grep -i langfuse` in the `dev` container prints nothing. Record the result.
+- [x] 4.4 Outage: maintainer stops `langfuse-web` on the host, agent posts a message. The reply is normal and `otelcol_receiver_accepted_spans` still grows. Restart `langfuse-web` and record what happened to the spans sent while it was down (retried and delivered, or dropped).
+- [x] 4.5 Maintainer runs the `telemetrygen` smoke test from the host; its traces appear in Langfuse with `service.name=telemetrygen`.
 
 ## Workflow follow-up
 
