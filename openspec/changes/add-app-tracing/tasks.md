@@ -15,12 +15,12 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "`TracerProvider`, samp
 
 ## 3. Tracing setup module (`app-tracing`: service identity, OTLP export, single exporter, flush at shutdown)
 
-- [ ] 3.1 Write failing unit tests in `tests/unit/core/test_telemetry.py`, using an `InMemorySpanExporter`, without touching the global provider: a span from the built provider carries `service.name=fornada-api`; with tracing disabled, setup returns nothing and leaves the global provider unchanged; after shutdown the buffered spans have been exported; the OTLP exporter targets `<TELEMETRY__OTLP_ENDPOINT>/v1/traces`. Shape the setup API (build vs. register, how the exporter is injected) so the tests can do this, as design.md says. Verify they fail.
-- [ ] 3.2 Create `fornada_api/core/telemetry.py` as a skeleton: the public functions the tests call, the module docstring, the URL join for `/v1/traces`, and the `HTTPX2ClientInstrumentor` call plus its `uninstrument()` at shutdown (periphery; plain `httpx` is not instrumented, see design.md). Leave `TODO(human)` markers and a "Learn by Doing" note for 3.3–3.5. Verify `uv run task lint typecheck` passes on the skeleton.
-- [ ] 3.3 TODO(human): build the `Resource`, with `service.name` plus whatever else the maintainer chooses (design.md, core decision 1).
-- [ ] 3.4 TODO(human): build the `TracerProvider` (sampler choice, core decision 2), the OTLP/HTTP span exporter and the `BatchSpanProcessor` (decision 3), and register the provider globally.
-- [ ] 3.5 TODO(human): decide the HTTP semconv opt-in (`OTEL_SEMCONV_STABILITY_OPT_IN`, decision 5) and where it is set, so it is in place before the instrumentors initialize.
-- [ ] 3.6 Agent reviews 3.3–3.5 only for mistakes that break the tests or startup, and asks questions instead of fixing. Verify the 3.1 tests pass and `uv run task check` passes.
+- [x] 3.1 Write failing unit tests in `tests/unit/core/test_telemetry.py`, using an `InMemorySpanExporter`, without touching the global provider: a span from the built provider carries `service.name=fornada-api`; with tracing disabled, setup returns nothing and leaves the global provider unchanged; after shutdown the buffered spans have been exported; the OTLP exporter targets `<TELEMETRY__OTLP_ENDPOINT>/v1/traces`. Shape the setup API (build vs. register, how the exporter is injected) so the tests can do this, as design.md says. Verify they fail.
+- [x] 3.2 Create `fornada_api/core/telemetry.py` as a skeleton: the public functions the tests call, the module docstring, the URL join for `/v1/traces`, and the `HTTPX2ClientInstrumentor` call plus its `uninstrument()` at shutdown (periphery; plain `httpx` is not instrumented, see design.md). Leave `TODO(human)` markers and a "Learn by Doing" note for 3.3–3.5. Verify `uv run task lint typecheck` passes on the skeleton.
+- [x] 3.3 TODO(human): build the `Resource`, with `service.name` plus whatever else the maintainer chooses (design.md, core decision 1).
+- [x] 3.4 TODO(human): build the `TracerProvider` (sampler choice, core decision 2), the OTLP/HTTP span exporter and the `BatchSpanProcessor` (decision 3), and register the provider globally.
+- [x] 3.5 TODO(human): decide the HTTP semconv opt-in (`OTEL_SEMCONV_STABILITY_OPT_IN`, decision 5) and where it is set, so it is in place before the instrumentors initialize.
+- [x] 3.6 Agent reviews 3.3–3.5 only for mistakes that break the tests or startup, and asks questions instead of fixing. Verify the 3.1 tests pass and `uv run task check` passes.
 
 ## 4. Wire tracing into the app (`app-tracing`: switch, server span, flush at shutdown)
 
