@@ -9,9 +9,9 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "`TracerProvider`, samp
 
 ## 2. Telemetry settings (`app-config`: namespaces, tracing switch, OTLP endpoint)
 
-- [ ] 2.1 Write failing unit tests in `tests/unit/core/test_config.py` for every scenario in the `app-config` delta: `TELEMETRY` namespace, `TELEMETRY__ENABLED` default off / `true` / invalid value names the variable, `TELEMETRY__OTLP_ENDPOINT` default `http://edot-collector:4318` / override / non-HTTP value names the variable. Verify they fail with `uv run task test:unit`.
-- [ ] 2.2 Add `TelemetrySettings` (`enabled: bool = False`, `otlp_endpoint` as an `http`/`https` URL with the default above) and the `telemetry` field on `Settings`. Verify the 2.1 tests pass.
-- [ ] 2.3 Add the `TELEMETRY` block to the root `.env.example` (`TELEMETRY__ENABLED=true` for the dev container, the endpoint, a comment that spans reach the Collector a few seconds late) and the two rows to the settings table in `apps/api/README.md`. Verify every `TelemetrySettings` field appears in both.
+- [x] 2.1 Write failing unit tests in `tests/unit/core/test_config.py` for every scenario in the `app-config` delta: `TELEMETRY` namespace, `TELEMETRY__ENABLED` default off / `true` / invalid value names the variable, `TELEMETRY__OTLP_ENDPOINT` default `http://edot-collector:4318` / override / non-HTTP value names the variable. Verify they fail with `uv run task test:unit`.
+- [x] 2.2 Add `TelemetrySettings` (`enabled: bool = False`, `otlp_endpoint` as an `http`/`https` URL with the default above) and the `telemetry` field on `Settings`. Verify the 2.1 tests pass.
+- [x] 2.3 Add the `TELEMETRY` block to the root `.env.example` (`TELEMETRY__ENABLED=true` for the dev container, the endpoint, a comment that spans reach the Collector a few seconds late) and the two rows to the settings table in `apps/api/README.md`. Verify every `TelemetrySettings` field appears in both.
 
 ## 3. Tracing setup module (`app-tracing`: service identity, OTLP export, single exporter, flush at shutdown)
 

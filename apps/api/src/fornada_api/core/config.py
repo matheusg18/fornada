@@ -7,6 +7,7 @@ environment with a double underscore: `LLM__ANTHROPIC__API_KEY`.
 from decimal import Decimal
 from functools import cache
 from typing import Any, Literal, Self
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 from pydantic import (
@@ -86,6 +87,22 @@ class DbSettings(BaseModel):
         return url
 
 
+class TelemetrySettings(BaseModel):
+    # Off by default so tests and CI never try to reach a Collector.
+    enabled: bool = False
+    # Base URL of the Collector's OTLP/HTTP receiver; the signal path
+    # (`/v1/traces`) is appended by the telemetry setup.
+    otlp_endpoint: str = "http://edot-collector:4318"
+
+    @field_validator("otlp_endpoint")
+    @classmethod
+    def _http_url(cls, url: str) -> str:
+        parts = urlsplit(url)
+        if parts.scheme not in ("http", "https") or not parts.hostname:
+            raise ValueError("must be an http(s) URL (http://host:4318)")
+        return url.rstrip("/")
+
+
 class ConfigError(ValueError):
     """Settings failed validation. The message names environment variables."""
 
@@ -103,6 +120,7 @@ class Settings(BaseSettings):
     app: AppSettings = AppSettings()
     log: LogSettings = LogSettings()
     db: DbSettings
+    telemetry: TelemetrySettings = TelemetrySettings()
 
     @model_validator(mode="before")
     @classmethod

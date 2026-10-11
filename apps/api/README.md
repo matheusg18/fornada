@@ -20,6 +20,8 @@ Nested settings use a double underscore, `NAMESPACE__FIELD`:
 | `APP__DAILY_CAPACITY_KG` | `15` | Oven capacity in kg for dates without a capacity override; must be > 0 |
 | `LOG__LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` or `CRITICAL` |
 | `DB__URL` | – (required) | PostgreSQL URL (`postgresql://…`); in the dev container, the value of `$DATABASE_URI` |
+| `TELEMETRY__ENABLED` | `false` | Export traces to the Collector (`true` in `.env.example`) |
+| `TELEMETRY__OTLP_ENDPOINT` | `http://edot-collector:4318` | Base URL of the Collector's OTLP/HTTP receiver; the app adds `/v1/traces` |
 
 Startup fails with a `ConfigError` that names the offending variable.
 
