@@ -83,6 +83,35 @@ every model answer (`response_metadata["prompt_version"]`) and in the graph
 state, so each answer in a conversation says which prompt wrote it. Restart the
 server after editing the prompt: `fastapi dev` reloads only on `.py` changes.
 
+## Tracing
+
+With `TELEMETRY__ENABLED=true`, the API sends traces over OTLP/HTTP to the EDOT
+Collector (`TELEMETRY__OTLP_ENDPOINT`), which for now only prints them to its
+log. `fornada_api/core/telemetry.py` builds the pipeline by hand and the
+lifespan starts and stops it. Per request you get:
+
+- one SERVER span, `POST /conversations/{conversation_id}/messages`, from
+  FastAPI's native OpenTelemetry (route template, method, status code);
+- three INTERNAL children: `fastapi.dependencies`, `fastapi.endpoint` and
+  `fastapi.serialization`;
+- one CLIENT span per LLM HTTP call (the `httpx2` client under the Anthropic
+  and OpenAI SDKs), in the same trace.
+
+Spans are exported in batches, so they reach the Collector about 5 s after the
+request (or at shutdown, which drains the queue). To check:
+
+```bash
+# dev container: Collector counters, before and after a request
+curl -s edot-collector:8888/metrics | grep -E '^otelcol_(receiver_accepted|exporter_sent)_spans'
+
+# host: the spans themselves (`docker compose ls` shows the project name)
+docker compose -p fornada_devcontainer logs edot-collector
+```
+
+With the Collector unreachable, requests still answer normally; the exporter
+logs a warning and retries for a few seconds at shutdown before dropping the
+spans.
+
 ## Database
 
 Models live in `fornada_api/models/` and mirror `.devcontainer/db/schema.sql`,
