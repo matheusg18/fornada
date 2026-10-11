@@ -18,7 +18,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "the pipelines in the C
 
 ## 3. Docs
 
-- [ ] 3.1 Update `apps/api/README.md` ("Tracing": traces go to Langfuse, where to look, the per-exporter counters) and the AGENTS.md dev environment notes (smoke test now ends in Langfuse; counters per exporter). Verify no remaining text says the Collector only logs or has no backend (`grep -rn -i "only prints\|no backend\|log only" apps/api/README.md AGENTS.md .devcontainer/`).
+- [x] 3.1 Update `apps/api/README.md` ("Tracing": traces go to Langfuse, where to look, the per-exporter counters) and the AGENTS.md dev environment notes (smoke test now ends in Langfuse; counters per exporter). Verify no remaining text says the Collector only logs or has no backend (`grep -rn -i "only prints\|no backend\|log only" apps/api/README.md AGENTS.md .devcontainer/`).
 
 ## 4. End-to-end check (all `telemetry-collector` deltas)
 

@@ -86,9 +86,10 @@ server after editing the prompt: `fastapi dev` reloads only on `.py` changes.
 ## Tracing
 
 With `TELEMETRY__ENABLED=true`, the API sends traces over OTLP/HTTP to the EDOT
-Collector (`TELEMETRY__OTLP_ENDPOINT`), which for now only prints them to its
-log. `fornada_api/core/telemetry.py` builds the pipeline by hand and the
-lifespan starts and stops it. Per request you get:
+Collector (`TELEMETRY__OTLP_ENDPOINT`), which forwards them to Langfuse.
+`fornada_api/core/telemetry.py` builds the pipeline by hand and the lifespan
+starts and stops it; the app has no Langfuse SDK or credentials. Per request
+you get:
 
 - one SERVER span, `POST /conversations/{conversation_id}/messages`, from
   FastAPI's native OpenTelemetry (route template, method, status code);
@@ -97,16 +98,26 @@ lifespan starts and stops it. Per request you get:
 - one CLIENT span per LLM HTTP call (the `httpx2` client under the Anthropic
   and OpenAI SDKs), in the same trace.
 
-Spans are exported in batches, so they reach the Collector about 5 s after the
-request (or at shutdown, which drains the queue). To check:
+Spans are exported in batches, so they reach Langfuse about 5 s after the
+request (or at shutdown, which drains the queue). To see them, open
+http://localhost:3000, project Fornada → Tracing. The table lists every
+observation (span); filter "Is Root Observation" to `True` for one row per
+request, and open a row for the tree and timeline. Span attributes are under
+Metadata.
+
+To check delivery without the UI:
 
 ```bash
 # dev container: Collector counters, before and after a request
-curl -s edot-collector:8888/metrics | grep -E '^otelcol_(receiver_accepted|exporter_sent)_spans'
+curl -s edot-collector:8888/metrics | grep -E '^otelcol_(receiver_accepted|exporter_sent|exporter_send_failed)_spans'
 
-# host: the spans themselves (`docker compose ls` shows the project name)
+# host: config or export errors (`docker compose ls` shows the project name)
 docker compose -p fornada_devcontainer logs edot-collector
 ```
+
+`otelcol_exporter_sent_spans{exporter="otlphttp/langfuse"}` grows with every
+export; a growing `send_failed_spans` usually means a 401 (wrong
+`LANGFUSE_OTLP_AUTH`) or a 404 (wrong endpoint path).
 
 With the Collector unreachable, requests still answer normally; the exporter
 logs a warning and retries for a few seconds at shutdown before dropping the
