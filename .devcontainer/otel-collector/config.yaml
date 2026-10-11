@@ -8,20 +8,31 @@
 # Components and config keys follow EDOT 9.5.5, which is built on Collector
 # core v0.161.0.
 
-# TODO(human): `otlp` receiver with gRPC (4317) and HTTP (4318). The receiver
-# listens on localhost by default, which other containers cannot reach, so
-# bind each protocol to 0.0.0.0. No port is published to the host, so this
-# only exposes it on the compose network.
-receivers: {}
+# OTLP over gRPC (4317) and HTTP (4318). The receiver listens on localhost by
+# default, which other containers cannot reach, so each protocol binds to
+# 0.0.0.0. No port is published to the host, so this only exposes it on the
+# compose network.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
 
-# TODO(human): `debug` exporter. `verbosity: detailed` prints each span with
-# its name and attributes; `basic` only logs counts.
-exporters: {}
+# `verbosity: detailed` prints each span with its name and attributes; `basic`
+# only logs counts.
+exporters:
+  debug:
+    verbosity: detailed
 
 service:
-  # TODO(human): one `traces` pipeline from the `otlp` receiver to the `debug`
-  # exporter.
-  pipelines: {}
+  # Traces only. Logs and metrics pipelines arrive with Elasticsearch and the
+  # redaction processors, so no message text reaches a log unredacted.
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [debug]
 
   # Internal metrics (otelcol_receiver_accepted_spans, otelcol_exporter_sent_spans)
   # on :8888, readable from the `dev` container, which has no Docker access:

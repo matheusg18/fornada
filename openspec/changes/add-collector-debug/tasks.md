@@ -4,7 +4,7 @@
 
 - [x] 1.1 Confirm that `elastic-otel-collector:9.5.5` and `telemetrygen:v0.162.0` are still the latest tags, and check how the slim image's `docker-entrypoint` handles `--config` (Elastic docs or the `elastic-agent` repo). Record the outcome in the compose comment. Verify by naming the doc or source line in the step summary.
 - [x] 1.2 Create `.devcontainer/otel-collector/config.yaml` as a skeleton: a header comment, the `service.telemetry` block exposing internal metrics on `0.0.0.0:8888`, and `TODO(human)` markers for `receivers` (OTLP gRPC and HTTP on `0.0.0.0`), `exporters` (`debug`, `verbosity: detailed`) and `service.pipelines` (one `traces` pipeline). Verify the file parses as YAML.
-- [ ] 1.3 TODO(human): the maintainer writes the `receivers`, `exporters` and `service.pipelines` sections (core work, AGENTS.md phase 2). The agent then reviews the file only for mistakes that would stop the Collector from starting.
+- [x] 1.3 TODO(human): the maintainer writes the `receivers`, `exporters` and `service.pipelines` sections (core work, AGENTS.md phase 2). The agent then reviews the file only for mistakes that would stop the Collector from starting.
 - [ ] 1.4 Add the `edot-collector` service to `.devcontainer/compose.yaml`: pinned image, `restart: unless-stopped`, config mounted read-only, `command: ["--config", …]`, no `ports:`, and a short comment in the file's style. Verify with `python -c 'import yaml…'` that the compose file parses and the service has no `ports` key.
 
 ## 2. Smoke-test generator (`telemetry-collector`: synthetic-span smoke test)
