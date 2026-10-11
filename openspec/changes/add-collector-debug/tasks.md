@@ -10,13 +10,13 @@
 ## 2. Smoke-test generator (`telemetry-collector`: synthetic-span smoke test)
 
 - [x] 2.1 Add the `telemetrygen` service to `.devcontainer/compose.yaml`: pinned image, `profiles: [smoke-test]`, `depends_on: edot-collector`, and the command `traces --otlp-endpoint edot-collector:4317 --otlp-insecure --traces 5`. Verify that the compose file parses and the service has the profile.
-- [ ] 2.2 Document the smoke test in AGENTS.md ("Dev environment" → services list): the new `edot-collector` service, its in-network endpoints, and the host commands (`docker compose ls` to find the project, `docker compose -p <project> -f .devcontainer/compose.yaml --profile smoke-test run --rm telemetrygen`, `docker compose -p <project> logs edot-collector`). Also document the in-container check `curl -s edot-collector:8888/metrics | grep accepted_spans`. Verify the commands match the compose file.
+- [x] 2.2 Document the smoke test in AGENTS.md ("Dev environment" → services list): the new `edot-collector` service, its in-network endpoints, and the host commands (`docker compose ls` to find the project, `docker compose -p <project> -f .devcontainer/compose.yaml --profile smoke-test run --rm telemetrygen`, `docker compose -p <project> logs edot-collector`). Also document the in-container check `curl -s edot-collector:8888/metrics | grep accepted_spans`. Verify the commands match the compose file.
 
 ## 3. End-to-end check (all `telemetry-collector` requirements)
 
-- [ ] 3.1 Maintainer, on the host: rebuild or reopen the dev container and confirm `edot-collector` is running (`docker compose -p <project> ps`) with no host port.
-- [ ] 3.2 Maintainer, on the host: run the telemetrygen command. It exits 0, and `docker compose logs edot-collector` shows the 10 synthetic spans (5 traces, each a root and one child span) with name and attributes. This is the "Pronto quando" for the change.
-- [ ] 3.3 Agent, in the dev container: `curl -s edot-collector:8888/metrics` reports `otelcol_receiver_accepted_spans` ≥ 10 for the `otlp` receiver and matching `otelcol_exporter_sent_spans` for `debug`. Paste the lines in the step summary.
+- [x] 3.1 Maintainer, on the host: rebuild or reopen the dev container and confirm `edot-collector` is running (`docker compose -p <project> ps`) with no host port.
+- [x] 3.2 Maintainer, on the host: run the telemetrygen command. It exits 0, and `docker compose logs edot-collector` shows the 10 synthetic spans (5 traces, each a root and one child span) with name and attributes. This is the "Pronto quando" for the change.
+- [x] 3.3 Agent, in the dev container: `curl -s edot-collector:8888/metrics` reports `otelcol_receiver_accepted_spans` ≥ 10 for the `otlp` receiver and matching `otelcol_exporter_sent_spans` for `debug`. Paste the lines in the step summary.
 
 ## Workflow follow-up
 
