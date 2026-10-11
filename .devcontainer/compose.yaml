@@ -1,5 +1,6 @@
 # Dev environment: the `dev` container plus local infrastructure, PostgreSQL
-# (app + Langfuse databases) and a self-hosted Langfuse v4 stack.
+# (app + Langfuse databases), a self-hosted Langfuse v4 stack and the EDOT
+# Collector (plus `telemetrygen`, an on-demand smoke test for it).
 #
 # Secrets for this environment live in `.devcontainer/.env`, which Compose loads
 # automatically from this folder (template: `.devcontainer/.env.example`; the
@@ -181,6 +182,28 @@ services:
       interval: 1s
       timeout: 5s
       retries: 5
+
+  edot-collector:
+    # Elastic's EDOT Collector, slim image. Its entrypoint runs
+    # `elastic-agent otel "$@"`, so `--config` passes straight through.
+    # OTLP on edot-collector:4317 (gRPC) and :4318 (HTTP), internal metrics on
+    # :8888, all reachable from `dev` by service name. No port is published to
+    # the host.
+    image: docker.elastic.co/elastic-agent/elastic-otel-collector:9.5.5
+    restart: unless-stopped
+    command: ["--config", "/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+
+  telemetrygen:
+    # Smoke test for the Collector: sends 5 synthetic traces (2 spans each) and
+    # exits. Behind a profile, so it never starts with the dev environment. Run
+    # it from the host (see AGENTS.md, "Dev environment").
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.162.0
+    profiles: [smoke-test]
+    depends_on:
+      - edot-collector
+    command: ["traces", "--otlp-endpoint", "edot-collector:4317", "--otlp-insecure", "--traces", "5"]
 
 volumes:
   postgres_data:

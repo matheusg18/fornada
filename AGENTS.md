@@ -180,7 +180,15 @@ apps/
 
 Development happens inside the dev container (`.devcontainer/`). It is the sandbox for agents: Claude Code runs there in `bypassPermissions` mode (set by `/etc/claude-code/managed-settings.json` in the image, so it applies only inside the container), as the non-root `vscode` user. There is no egress firewall. Do not add a Docker socket or host credentials to the container, because that would break the isolation.
 
-- **Services** (`.devcontainer/compose.yaml`): `dev` (the workspace), `postgres` (PostgreSQL 18 with the `fornada` and `langfuse` databases) and Langfuse v4 (`langfuse-web`, `langfuse-worker`, plus its dependencies `clickhouse`, `valkey` and `minio`). Langfuse UI: http://localhost:3000. Inside the container, use service names (`postgres:5432`, `langfuse-web:3000`).
+- **Services** (`.devcontainer/compose.yaml`): `dev` (the workspace), `postgres` (PostgreSQL 18 with the `fornada` and `langfuse` databases) and Langfuse v4 (`langfuse-web`, `langfuse-worker`, plus its dependencies `clickhouse`, `valkey` and `minio`) and the EDOT Collector (`edot-collector`, config in `.devcontainer/otel-collector/config.yaml`). Langfuse UI: http://localhost:3000. Inside the container, use service names (`postgres:5432`, `langfuse-web:3000`, `edot-collector:4317` for OTLP gRPC and `:4318` for OTLP HTTP). The Collector publishes no host port.
+- **Collector smoke test:** `telemetrygen` is a compose service behind the `smoke-test` profile, so it never starts with the environment. It sends 5 synthetic traces (10 spans) to the Collector. The dev container has no Docker socket, so the maintainer runs it from the repo root on the host. `docker compose ls` shows the project name (usually `fornada_devcontainer`):
+
+  ```bash
+  docker compose -p fornada_devcontainer -f .devcontainer/compose.yaml --profile smoke-test run --rm telemetrygen
+  docker compose -p fornada_devcontainer logs edot-collector
+  ```
+
+  Without the right `-p`, compose creates a separate project and network, and `edot-collector` does not resolve. From inside the dev container, the Collector's internal metrics confirm what it received: `curl -s edot-collector:8888/metrics | grep spans` (`otelcol_receiver_accepted_spans`, `otelcol_exporter_sent_spans`).
 - **Toolchain:** uv manages Python (the version in `.python-version`); Node LTS, `gh`, `psql` and Chrome (for the Playwright MCP) are preinstalled. The virtualenv lives in a volume at `/workspaces/fornada/.venv`, separate from the host.
 - **Persisted volumes:** Claude Code config and login (`CLAUDE_CONFIG_DIR=/home/vscode/.claude`), `gh` login, uv cache, shell history, and data for every service.
 - **Database seed:** `.devcontainer/db/schema.sql` and `.devcontainer/db/seed.sql` load into `fornada` on the first start of an empty Postgres volume only. To reset a running database: `psql "$DATABASE_URI" -v ON_ERROR_STOP=1 -f .devcontainer/db/schema.sql -f .devcontainer/db/seed.sql` (see `.devcontainer/db/README.md`).
