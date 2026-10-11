@@ -10,11 +10,11 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "the pipelines in the C
 
 ## 2. Collector pipeline (`telemetry-collector`: exported to Langfuse, outage does not affect reception)
 
-- [ ] 2.1 Agent prepares `.devcontainer/otel-collector/config.yaml`: update the header comment (no longer "no backend"), and leave `TODO(human)` markers with a "Learn by Doing" note for 2.2–2.4, referencing design.md decision 4. Verify the file is still valid YAML (`python3 -c 'import yaml,sys; yaml.safe_load(open(sys.argv[1]))' …`).
-- [ ] 2.2 TODO(human): write the `otlphttp/langfuse` exporter: endpoint on the compose network and the `Authorization` and `x-langfuse-ingestion-version` headers, with the credential read from the environment (decision 4.1).
-- [ ] 2.3 TODO(human): decide whether `debug` stays in the traces pipeline and at which verbosity, and add `otlphttp/langfuse` to the pipeline's exporters (decision 4.2).
-- [ ] 2.4 TODO(human): decide on processors for this step (none, or `memory_limiter`/`batch`), with a one-line comment for the choice (decision 4.3).
-- [ ] 2.5 Agent reviews 2.2–2.4 only for mistakes that stop the Collector from starting or authenticating, and asks questions instead of fixing. Maintainer rebuilds the dev container (so `init-env.sh` and compose apply) or, if `.devcontainer/.env` already has the value, recreates `edot-collector` from the host. Verify `curl -s edot-collector:8888/metrics` answers from the `dev` container and the host's `docker compose -p fornada_devcontainer logs edot-collector` shows no config or auth error.
+- [x] 2.1 Agent prepares `.devcontainer/otel-collector/config.yaml`: update the header comment (no longer "no backend"), and leave `TODO(human)` markers with a "Learn by Doing" note for 2.2–2.4, referencing design.md decision 4. Verify the file is still valid YAML (`python3 -c 'import yaml,sys; yaml.safe_load(open(sys.argv[1]))' …`).
+- [x] 2.2 TODO(human): write the `otlphttp/langfuse` exporter: endpoint on the compose network and the `Authorization` and `x-langfuse-ingestion-version` headers, with the credential read from the environment (decision 4.1).
+- [x] 2.3 TODO(human): decide whether `debug` stays in the traces pipeline and at which verbosity, and add `otlphttp/langfuse` to the pipeline's exporters (decision 4.2).
+- [x] 2.4 TODO(human): decide on processors for this step (none, or `memory_limiter`/`batch`), with a one-line comment for the choice (decision 4.3).
+- [x] 2.5 Agent reviews 2.2–2.4 only for mistakes that stop the Collector from starting or authenticating, and asks questions instead of fixing. Maintainer rebuilds the dev container (so `init-env.sh` and compose apply) or, if `.devcontainer/.env` already has the value, recreates `edot-collector` from the host. Verify `curl -s edot-collector:8888/metrics` answers from the `dev` container and the host's `docker compose -p fornada_devcontainer logs edot-collector` shows no config or auth error.
 
 ## 3. Docs
 

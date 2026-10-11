@@ -1,9 +1,9 @@
 # EDOT Collector config for the dev environment, mounted read-only into the
 # `edot-collector` service (.devcontainer/compose.yaml).
 #
-# This step has no backend: OTLP in, `debug` exporter out, so received spans
-# show up in the Collector's own log. Langfuse and Elasticsearch exporters and
-# the redaction processors come in later phase 2 steps.
+# Traces go from OTLP to Langfuse (the LLM view), over the compose network.
+# Elasticsearch, the logs and metrics pipelines and the redaction processors
+# come in phase 2 step B.
 #
 # Components and config keys follow EDOT 9.5.5, which is built on Collector
 # core v0.161.0.
@@ -20,11 +20,15 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
-# `verbosity: detailed` prints each span with its name and attributes; `basic`
-# only logs counts.
+# Langfuse ingests OTLP over HTTP only. `endpoint` is the base path; the
+# exporter adds /v1/traces. The ingestion-version header makes spans show up
+# in real time instead of up to 10 minutes later.
 exporters:
-  debug:
-    verbosity: detailed
+  otlphttp/langfuse:
+    endpoint: "http://langfuse-web:3000/api/public/otel"
+    headers:
+      Authorization: "Basic ${env:LANGFUSE_OTLP_AUTH}"
+      x-langfuse-ingestion-version: "4"
 
 service:
   # Traces only. Logs and metrics pipelines arrive with Elasticsearch and the
@@ -32,7 +36,9 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      exporters: [debug]
+      # No processors: the app already batches spans and otlphttp queues and
+      # retries on its own.
+      exporters: [otlphttp/langfuse]
 
   # Internal metrics (otelcol_receiver_accepted_spans, otelcol_exporter_sent_spans)
   # on :8888, readable from the `dev` container, which has no Docker access:
