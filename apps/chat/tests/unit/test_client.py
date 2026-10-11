@@ -2,7 +2,7 @@ import json
 import logging
 from uuid import uuid4
 
-import httpx
+import httpx2
 import pytest
 
 from fornada_chat.client import (
@@ -17,34 +17,34 @@ pytestmark = pytest.mark.anyio
 CONVERSATION_ID = uuid4()
 
 
-def make_client(handler: httpx.MockTransport | None = None, **kwargs) -> httpx.AsyncClient:
-    return httpx.AsyncClient(
+def make_client(handler: httpx2.MockTransport | None = None, **kwargs) -> httpx2.AsyncClient:
+    return httpx2.AsyncClient(
         base_url=kwargs.pop("base_url", "http://api.test"), transport=handler, **kwargs
     )
 
 
-def replying(status: int = 200, body: object | None = None) -> httpx.MockTransport:
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(status, json=body)
+def replying(status: int = 200, body: object | None = None) -> httpx2.MockTransport:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(status, json=body)
 
-    return httpx.MockTransport(handler)
+    return httpx2.MockTransport(handler)
 
 
-def raising(exc: Exception) -> httpx.MockTransport:
-    def handler(request: httpx.Request) -> httpx.Response:
+def raising(exc: Exception) -> httpx2.MockTransport:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         raise exc
 
-    return httpx.MockTransport(handler)
+    return httpx2.MockTransport(handler)
 
 
 async def test_posts_text_to_the_conversation_path() -> None:
-    seen: list[httpx.Request] = []
+    seen: list[httpx2.Request] = []
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         seen.append(request)
-        return httpx.Response(200, json={"replies": [{"text": "Olá!"}]})
+        return httpx2.Response(200, json={"replies": [{"text": "Olá!"}]})
 
-    async with make_client(httpx.MockTransport(handler)) as http:
+    async with make_client(httpx2.MockTransport(handler)) as http:
         await send_message(http, CONVERSATION_ID, "Oi, quero um bolo de chocolate")
 
     (request,) = seen
@@ -73,13 +73,13 @@ def test_blank_api_url_falls_back_to_the_default() -> None:
 
 
 async def test_custom_base_url_is_used() -> None:
-    seen: list[httpx.Request] = []
+    seen: list[httpx2.Request] = []
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         seen.append(request)
-        return httpx.Response(200, json={"replies": [{"text": "ok"}]})
+        return httpx2.Response(200, json={"replies": [{"text": "ok"}]})
 
-    async with make_client(httpx.MockTransport(handler), base_url="http://api.local:9000") as http:
+    async with make_client(httpx2.MockTransport(handler), base_url="http://api.local:9000") as http:
         await send_message(http, CONVERSATION_ID, "oi")
 
     assert str(seen[0].url) == f"http://api.local:9000/conversations/{CONVERSATION_ID}/messages"
@@ -88,8 +88,8 @@ async def test_custom_base_url_is_used() -> None:
 @pytest.mark.parametrize(
     ("transport", "kind"),
     [
-        (raising(httpx.ConnectError("refused")), "connect"),
-        (raising(httpx.ReadTimeout("slow")), "timeout"),
+        (raising(httpx2.ConnectError("refused")), "connect"),
+        (raising(httpx2.ReadTimeout("slow")), "timeout"),
         (replying(500, {"detail": "boom"}), "status"),
         (replying(422, {"detail": "bad"}), "status"),
         (replying(200, {"nope": []}), "bad_body"),
@@ -99,7 +99,7 @@ async def test_custom_base_url_is_used() -> None:
         (replying(200, ["not", "an", "object"]), "bad_body"),
     ],
 )
-async def test_failures_raise_api_error(transport: httpx.MockTransport, kind: str) -> None:
+async def test_failures_raise_api_error(transport: httpx2.MockTransport, kind: str) -> None:
     async with make_client(transport) as http:
         with pytest.raises(ApiError) as excinfo:
             await send_message(http, CONVERSATION_ID, "oi")
@@ -107,7 +107,7 @@ async def test_failures_raise_api_error(transport: httpx.MockTransport, kind: st
 
 
 async def test_non_json_body_is_a_bad_body() -> None:
-    transport = httpx.MockTransport(lambda request: httpx.Response(200, content=b"<html>"))
+    transport = httpx2.MockTransport(lambda request: httpx2.Response(200, content=b"<html>"))
     async with make_client(transport) as http:
         with pytest.raises(ApiError) as excinfo:
             await send_message(http, CONVERSATION_ID, "oi")
@@ -119,7 +119,7 @@ async def test_failure_logs_the_conversation_id_but_never_the_text(
 ) -> None:
     secret = "81987654321"
     with caplog.at_level(logging.DEBUG):
-        async with make_client(raising(httpx.ConnectError("refused"))) as http:
+        async with make_client(raising(httpx2.ConnectError("refused"))) as http:
             with pytest.raises(ApiError):
                 await send_message(http, CONVERSATION_ID, f"Meu telefone é {secret}")
 

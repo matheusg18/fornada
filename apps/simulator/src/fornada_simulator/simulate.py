@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
-import httpx
+import httpx2
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
 from fornada_simulator.client import ApiError, send_message
@@ -60,7 +60,7 @@ def _text_of(message: BaseMessage) -> str:
 async def run_conversation(
     persona: Persona,
     goal: str,
-    http: httpx.AsyncClient,
+    http: httpx2.AsyncClient,
     model: ChatModel,
     *,
     max_turns: int,
@@ -158,14 +158,14 @@ async def run_batch(
     *,
     runs_dir: Path,
     run_id: str | None = None,
-    transport: httpx.AsyncBaseTransport | None = None,
+    transport: httpx2.AsyncBaseTransport | None = None,
 ) -> list[Transcript]:
     """Run the planned conversations; each transcript is appended as it finishes."""
     run_id = run_id or new_run_id()
     path = runs_dir / f"{run_id}.jsonl"
     semaphore = asyncio.Semaphore(settings.concurrency)
 
-    async with httpx.AsyncClient(
+    async with httpx2.AsyncClient(
         base_url=settings.api_url, timeout=120, transport=transport
     ) as http:
 

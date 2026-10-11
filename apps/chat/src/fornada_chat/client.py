@@ -10,7 +10,7 @@ import os
 from collections.abc import Mapping
 from uuid import UUID
 
-import httpx
+import httpx2
 
 DEFAULT_API_URL = "http://localhost:8000"
 
@@ -44,15 +44,15 @@ def _fail(conversation_id: UUID, kind: str, **extra: object) -> ApiError:
     return ApiError(kind)
 
 
-async def send_message(http: httpx.AsyncClient, conversation_id: UUID, text: str) -> list[str]:
+async def send_message(http: httpx2.AsyncClient, conversation_id: UUID, text: str) -> list[str]:
     """Post one customer message; return the bot's reply texts, in order."""
     try:
         response = await http.post(
             f"/conversations/{conversation_id}/messages", json={"text": text}
         )
-    except httpx.TimeoutException as exc:
+    except httpx2.TimeoutException as exc:
         raise _fail(conversation_id, "timeout") from exc
-    except httpx.TransportError as exc:
+    except httpx2.TransportError as exc:
         raise _fail(conversation_id, "connect") from exc
 
     if response.status_code != 200:

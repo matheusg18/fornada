@@ -956,7 +956,7 @@ version = "0.1.0"
 source = { editable = "apps/chat" }
 dependencies = [
     { name = "chainlit" },
-    { name = "httpx" },
+    { name = "httpx2" },
 ]
 
 [package.dev-dependencies]
@@ -970,7 +970,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "chainlit", specifier = ">=2.12.0" },
-    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "httpx2", specifier = ">=2.13.1" },
 ]
 
 [package.metadata.requires-dev]
@@ -986,7 +986,7 @@ name = "fornada-simulator"
 version = "0.1.0"
 source = { editable = "apps/simulator" }
 dependencies = [
-    { name = "httpx" },
+    { name = "httpx2" },
     { name = "langchain-anthropic" },
     { name = "langchain-openai" },
     { name = "pydantic-settings" },
@@ -1006,7 +1006,7 @@ notebook = [
 
 [package.metadata]
 requires-dist = [
-    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "httpx2", specifier = ">=2.13.1" },
     { name = "langchain-anthropic", specifier = ">=1.7.5" },
     { name = "langchain-openai", specifier = ">=1.6.7" },
     { name = "pydantic-settings", specifier = ">=2.15.0" },

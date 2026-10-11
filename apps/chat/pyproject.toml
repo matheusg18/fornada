@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "chainlit>=2.12.0",
-    "httpx>=0.28.1",
+    "httpx2>=2.13.1",
 ]
 
 [build-system]
@@ -32,6 +32,8 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "ASYNC", "RUF"]
 include = ["src", "tests"]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
+# Off in "standard"; fail on deprecated APIs instead of a Pylance strikethrough.
+reportDeprecated = "error"
 venvPath = "../.."
 venv = ".venv"
 

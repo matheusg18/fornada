@@ -4,7 +4,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from uuid import UUID
 
-import httpx
+import httpx2
 import pytest
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
@@ -41,18 +41,18 @@ class ScriptedModel:
 
 
 def api(
-    handler: Callable[[httpx.Request], httpx.Response] | None = None,
-) -> tuple[httpx.AsyncClient, list[httpx.Request]]:
-    seen: list[httpx.Request] = []
+    handler: Callable[[httpx2.Request], httpx2.Response] | None = None,
+) -> tuple[httpx2.AsyncClient, list[httpx2.Request]]:
+    seen: list[httpx2.Request] = []
 
-    def default(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"replies": [{"text": "Oi!"}]})
+    def default(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, json={"replies": [{"text": "Oi!"}]})
 
-    def respond(request: httpx.Request) -> httpx.Response:
+    def respond(request: httpx2.Request) -> httpx2.Response:
         seen.append(request)
         return (handler or default)(request)
 
-    client = httpx.AsyncClient(base_url="http://api", transport=httpx.MockTransport(respond))
+    client = httpx2.AsyncClient(base_url="http://api", transport=httpx2.MockTransport(respond))
     return client, seen
 
 
@@ -74,7 +74,9 @@ async def test_first_message_is_posted_under_a_new_uuid4() -> None:
 
 async def test_both_replies_reach_the_persona_in_order() -> None:
     http, _ = api(
-        lambda r: httpx.Response(200, json={"replies": [{"text": "primeiro"}, {"text": "segundo"}]})
+        lambda r: httpx2.Response(
+            200, json={"replies": [{"text": "primeiro"}, {"text": "segundo"}]}
+        )
     )
     model = ScriptedModel(["oi", END_MARKER])
     async with http:
@@ -130,10 +132,10 @@ async def test_a_persona_that_never_ends_stops_at_the_cap() -> None:
 
 
 async def test_api_failure_on_turn_three_keeps_two_turns() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         if len(seen) == 3:
-            return httpx.Response(503)
-        return httpx.Response(200, json={"replies": [{"text": "ok"}]})
+            return httpx2.Response(503)
+        return httpx2.Response(200, json={"replies": [{"text": "ok"}]})
 
     http, seen = api(handler)
     async with http:
@@ -157,7 +159,7 @@ async def test_persona_model_failure_keeps_the_first_turn() -> None:
 
 async def test_logs_never_contain_message_text(caplog: pytest.LogCaptureFixture) -> None:
     http, _ = api(
-        lambda r: httpx.Response(200, json={"replies": [{"text": "resposta-secreta-do-bot"}]})
+        lambda r: httpx2.Response(200, json={"replies": [{"text": "resposta-secreta-do-bot"}]})
     )
     caplog.set_level(logging.DEBUG)
     async with http:
@@ -188,13 +190,13 @@ def settings(**overrides: object) -> SimulatorSettings:
 async def test_a_failing_conversation_never_stops_the_batch(tmp_path: Path) -> None:
     posts = 0
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         nonlocal posts
         posts += 1
         # Every fifth call fails: those conversations end with api_error.
         if posts % 5 == 0:
-            return httpx.Response(503)
-        return httpx.Response(200, json={"replies": [{"text": "ok"}]})
+            return httpx2.Response(503)
+        return httpx2.Response(200, json={"replies": [{"text": "ok"}]})
 
     class EndingModel:
         async def ainvoke(self, input: list[BaseMessage], /) -> BaseMessage:
@@ -205,7 +207,7 @@ async def test_a_failing_conversation_never_stops_the_batch(tmp_path: Path) -> N
         EndingModel(),
         runs_dir=tmp_path,
         run_id="batch",
-        transport=httpx.MockTransport(handler),
+        transport=httpx2.MockTransport(handler),
     )
     assert len(transcripts) == 20
     assert "api_error" in {t.outcome for t in transcripts}

@@ -3,12 +3,12 @@
 from uuid import UUID, uuid4
 
 import chainlit as cl
-import httpx
+import httpx2
 
 from fornada_chat.client import API_URL, ERROR_MESSAGE, ApiError, send_message
 
 # A real agent turn can chain several LLM and tool calls, so wait longer than
-# httpx's 5 s default.
+# httpx2's 5 s default.
 REQUEST_TIMEOUT_SECONDS = 60
 
 CONVERSATION_ID_KEY = "conversation_id"
@@ -25,7 +25,7 @@ async def main(message: cl.Message) -> None:
     if not isinstance(conversation_id, UUID):
         raise RuntimeError("chat session has no conversation id; on_chat_start did not run")
     try:
-        async with httpx.AsyncClient(base_url=API_URL, timeout=REQUEST_TIMEOUT_SECONDS) as http:
+        async with httpx2.AsyncClient(base_url=API_URL, timeout=REQUEST_TIMEOUT_SECONDS) as http:
             replies = await send_message(http, conversation_id, message.content)
     except ApiError:
         await cl.Message(content=ERROR_MESSAGE).send()
