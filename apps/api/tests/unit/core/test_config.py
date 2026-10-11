@@ -16,7 +16,7 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     import os
 
     for name in list(os.environ):
-        if name.upper().startswith(("LLM__", "APP__", "LOG__", "DB__")):
+        if name.upper().startswith(("LLM__", "APP__", "LOG__", "DB__", "TELEMETRY__")):
             monkeypatch.delenv(name)
 
 
@@ -218,6 +218,53 @@ def test_lowercase_log_level(with_key: None, monkeypatch: pytest.MonkeyPatch) ->
 def test_invalid_log_level(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LOG__LEVEL", "LOUD")
     with pytest.raises(ConfigError, match="LOG__LEVEL"):
+        load()
+
+
+# --- telemetry -----------------------------------------------------------------
+
+
+def test_telemetry_namespace(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TELEMETRY__ENABLED", "true")
+    assert load().telemetry.enabled is True
+
+
+def test_tracing_off_by_default(with_key: None) -> None:
+    assert load().telemetry.enabled is False
+
+
+@pytest.mark.parametrize("value", ["maybe", "2"])
+def test_invalid_tracing_switch(
+    value: str, with_key: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TELEMETRY__ENABLED", value)
+    with pytest.raises(ConfigError, match="TELEMETRY__ENABLED"):
+        load()
+
+
+def test_default_otlp_endpoint(with_key: None) -> None:
+    assert load().telemetry.otlp_endpoint == "http://edot-collector:4318"
+
+
+def test_otlp_endpoint_override(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TELEMETRY__OTLP_ENDPOINT", "http://localhost:4318")
+    assert load().telemetry.otlp_endpoint == "http://localhost:4318"
+
+
+def test_otlp_endpoint_trailing_slash_is_dropped(
+    with_key: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The signal path is appended to this value; a trailing slash would double it.
+    monkeypatch.setenv("TELEMETRY__OTLP_ENDPOINT", "https://collector.example:4318/")
+    assert load().telemetry.otlp_endpoint == "https://collector.example:4318"
+
+
+@pytest.mark.parametrize(
+    "value", ["edot-collector:4317", "grpc://edot-collector:4317", "http://", ""]
+)
+def test_invalid_otlp_endpoint(value: str, with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TELEMETRY__OTLP_ENDPOINT", value)
+    with pytest.raises(ConfigError, match="TELEMETRY__OTLP_ENDPOINT"):
         load()
 
 
