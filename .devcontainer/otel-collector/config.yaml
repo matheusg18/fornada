@@ -1,0 +1,36 @@
+# EDOT Collector config for the dev environment, mounted read-only into the
+# `edot-collector` service (.devcontainer/compose.yaml).
+#
+# This step has no backend: OTLP in, `debug` exporter out, so received spans
+# show up in the Collector's own log. Langfuse and Elasticsearch exporters and
+# the redaction processors come in later phase 2 steps.
+#
+# Components and config keys follow EDOT 9.5.5, which is built on Collector
+# core v0.161.0.
+
+# TODO(human): `otlp` receiver with gRPC (4317) and HTTP (4318). The receiver
+# listens on localhost by default, which other containers cannot reach, so
+# bind each protocol to 0.0.0.0. No port is published to the host, so this
+# only exposes it on the compose network.
+receivers: {}
+
+# TODO(human): `debug` exporter. `verbosity: detailed` prints each span with
+# its name and attributes; `basic` only logs counts.
+exporters: {}
+
+service:
+  # TODO(human): one `traces` pipeline from the `otlp` receiver to the `debug`
+  # exporter.
+  pipelines: {}
+
+  # Internal metrics (otelcol_receiver_accepted_spans, otelcol_exporter_sent_spans)
+  # on :8888, readable from the `dev` container, which has no Docker access:
+  #   curl -s edot-collector:8888/metrics | grep spans
+  telemetry:
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
