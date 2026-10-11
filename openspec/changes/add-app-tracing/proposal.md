@@ -16,7 +16,7 @@ The Collector already accepts OTLP and prints spans with its `debug` exporter, b
 - Outgoing `httpx2` requests (the transport under the Anthropic and OpenAI SDKs) are traced with the `httpx2` instrumentor from `opentelemetry-instrumentation-httpx`, so they appear as CLIENT spans inside the request's trace. Plain `httpx` is not instrumented: no request on a conversation turn goes through it.
 - New `TELEMETRY` settings namespace: tracing on/off and the Collector's OTLP endpoint. Tracing is off by default, so tests and CI never try to reach a Collector. The root `.env.example` turns it on for the dev container.
 - `fastapi` is upgraded to the latest release (0.143), where automatic exporter setup is opt-in.
-- The lifespan keeps `@asynccontextmanager`. It is not deprecated: FastAPI's docs still recommend it, and only `@app.on_event` is deprecated (see design.md).
+- The lifespan keeps `@asynccontextmanager`, but its return annotation changes from `AsyncIterator[None]`, which typeshed deprecates for this decorator, to `AsyncGenerator[None]`. Pyright's `reportDeprecated` is turned on in `apps/api` so deprecated APIs fail `task check` (see design.md).
 
 ## Capabilities
 

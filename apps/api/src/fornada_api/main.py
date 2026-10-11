@@ -1,7 +1,7 @@
 """FastAPI application. Serve it with `fastapi dev` (see the README)."""
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # Invalid settings fail here, before any request is served.
     settings = get_settings()
     configure_logging(settings.log)

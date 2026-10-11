@@ -49,6 +49,9 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "ASYNC", "RUF"]
 include = ["src", "tests"]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
+# Off in "standard"; catches deprecated APIs, e.g. `-> AsyncIterator` on
+# `@asynccontextmanager`, which Pylance only shows as a strikethrough.
+reportDeprecated = "error"
 venvPath = "../.."
 venv = ".venv"
 
