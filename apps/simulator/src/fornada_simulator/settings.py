@@ -2,14 +2,23 @@
 
 Variables live under the `SIMULATOR__` namespace and nested values use a double
 underscore: `SIMULATOR__ANTHROPIC__API_KEY`. The simulator's model is configured
-apart from the agent's (`LLM__*`).
+apart from the agent's (`LLM__*`). Tracing shares the API's `TELEMETRY__*`
+variables, so one switch in the root `.env` covers both.
 """
 
 from functools import cache
 from pathlib import Path
 from typing import Any, Literal, Self
+from urllib.parse import urlsplit
 
-from pydantic import BaseModel, Field, SecretStr, ValidationError, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    SecretStr,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LlmProvider = Literal["anthropic", "openai"]
@@ -67,6 +76,22 @@ class SimulatorSettings(BaseModel):
         return self
 
 
+class TelemetrySettings(BaseModel):
+    # Off by default so tests and CI never try to reach a Collector.
+    enabled: bool = False
+    # Base URL of the Collector's OTLP/HTTP receiver; the telemetry setup
+    # appends the signal path (`/v1/traces`).
+    otlp_endpoint: str = "http://edot-collector:4318"
+
+    @field_validator("otlp_endpoint")
+    @classmethod
+    def _http_url(cls, url: str) -> str:
+        parts = urlsplit(url)
+        if parts.scheme not in ("http", "https") or not parts.hostname:
+            raise ValueError("must be an http(s) URL (http://host:4318)")
+        return url.rstrip("/")
+
+
 class ConfigError(ValueError):
     """Settings failed validation. The message names environment variables."""
 
@@ -81,6 +106,7 @@ class Settings(BaseSettings):
     )
 
     simulator: SimulatorSettings
+    telemetry: TelemetrySettings = TelemetrySettings()
 
     @model_validator(mode="before")
     @classmethod

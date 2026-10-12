@@ -19,6 +19,11 @@ the folder it starts in.
 | Variable | Default | Meaning |
 |---|---|---|
 | `CHAT__API_URL` | `http://localhost:8000` | Base URL of `fornada-api` |
+| `TELEMETRY__ENABLED` | `false` | Send traces to the Collector |
+| `TELEMETRY__OTLP_ENDPOINT` | `http://edot-collector:4318` | Collector's OTLP/HTTP base URL |
+
+Chainlit loads `.env` from `apps/chat`, not the root one, so set the
+`TELEMETRY__*` variables in the shell or in `apps/chat/.env`.
 
 ## How it works
 
@@ -39,6 +44,30 @@ Code layout: `fornada_chat/app.py` holds the Chainlit callbacks;
 `fornada_chat/client.py` is the plain HTTP client (the part with unit tests).
 `.chainlit/config.toml` and `chainlit.md` are versioned; Chainlit regenerates
 `.chainlit/translations/` and `.files/` on start (both git-ignored).
+
+## Tracing
+
+With `TELEMETRY__ENABLED=true`, each message the chat posts is one span of kind
+CLIENT, `POST /conversations/{conversation_id}/messages`, from the service
+`fornada-chat`. It is the root of that turn's trace: the request carries its
+context in a W3C `traceparent` header, so the API's spans join the same trace.
+The span carries the conversation id as `session.id` and
+`gen_ai.conversation.id`, so all turns of a chat are one Langfuse session. It
+also carries the HTTP method, URL template, server address and port, and the
+response status code. A failed post sets the status to ERROR with an
+`error.type` (the status code, `connect`, `timeout` or `bad_body`). No message
+or reply text goes into a span.
+
+The chat's tracer provider is private: it is never registered as the global
+OpenTelemetry provider. Chainlit's server is a FastAPI app, and FastAPI traces
+every request through the global provider. Registering it would turn the
+websocket into one span open for the whole tab, with every message inside it.
+So the chat exports only its own client spans. `fornada_chat/telemetry.py`
+builds the provider, and the `on_app_startup` and `on_app_shutdown` hooks in
+`app.py` start it and drain it.
+
+Do not set `LITERAL_API_KEY`. It turns on Chainlit's Literal AI data layer,
+which starts Traceloop with its own global provider.
 
 ## Python 3.13
 

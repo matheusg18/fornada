@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from collections.abc import Callable, Sequence
@@ -7,7 +8,10 @@ from uuid import UUID
 import httpx2
 import pytest
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import SpanKind
 
+from fornada_simulator import simulate
 from fornada_simulator.personas import PERSONAS
 from fornada_simulator.settings import SimulatorSettings
 from fornada_simulator.simulate import END_MARKER, plan_jobs, run_batch, run_conversation
@@ -212,3 +216,63 @@ async def test_a_failing_conversation_never_stops_the_batch(tmp_path: Path) -> N
     assert len(transcripts) == 20
     assert "api_error" in {t.outcome for t in transcripts}
     assert len(read_jsonl(tmp_path / "batch.jsonl")) == 20
+
+
+# --- tracing -------------------------------------------------------------------
+
+
+def replies_ok(request: httpx2.Request) -> httpx2.Response:
+    return httpx2.Response(200, json={"replies": [{"text": "ok"}]})
+
+
+async def test_batch_flushes_spans_before_returning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, spans: InMemorySpanExporter
+) -> None:
+    exported_at_flush: list[int] = []
+
+    def spy() -> None:
+        exported_at_flush.append(len(spans.get_finished_spans()))
+
+    monkeypatch.setattr(simulate, "flush_tracing", spy)
+    transcripts = await run_batch(
+        settings(runs_per_persona=1),
+        ScriptedModel([f"oi {END_MARKER}"], repeat_last=True),
+        runs_dir=tmp_path,
+        transport=httpx2.MockTransport(replies_ok),
+    )
+
+    # Called once, after every conversation's spans had ended.
+    assert exported_at_flush == [len(transcripts)]
+
+
+class TwoTurnModel:
+    """Each conversation posts one message, then ends on the next turn."""
+
+    async def ainvoke(self, input: list[BaseMessage], /) -> BaseMessage:
+        await asyncio.sleep(0)
+        return AIMessage("oi" if len(input) < 4 else f"tchau {END_MARKER}")
+
+
+async def test_concurrent_conversations_keep_their_own_traces(
+    tmp_path: Path, spans: InMemorySpanExporter
+) -> None:
+    transcripts = await run_batch(
+        settings(runs_per_persona=1, concurrency=2),
+        TwoTurnModel(),
+        runs_dir=tmp_path,
+        run_id="run-1",
+        transport=httpx2.MockTransport(replies_ok),
+    )
+
+    found = [s for s in spans.get_finished_spans() if s.kind is SpanKind.CLIENT]
+    assert len(found) == 2 * len(transcripts)
+    # Every post is its own root: no span picked up another task's context.
+    assert all(s.parent is None for s in found)
+    assert len({s.context.trace_id for s in found if s.context}) == len(found)
+    persona_of = {str(t.conversation_id): t.persona_id for t in transcripts}
+    for span in found:
+        attributes = dict(span.attributes or {})
+        assert (
+            attributes["fornada.simulator.persona.id"] == persona_of[str(attributes["session.id"])]
+        )
+        assert attributes["fornada.simulator.run.id"] == "run-1"
