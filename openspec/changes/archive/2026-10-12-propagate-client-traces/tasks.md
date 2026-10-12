@@ -31,7 +31,7 @@
 ## 4. Configuration and end-to-end check
 
 - [x] 4.1 Update `.env.example` so the `TELEMETRY__*` block says it is read by the API, the simulator and the chat (the chat from its shell or `apps/chat/.env`). Verify the simulator picks it up from the root `.env` with one conversation.
-- [ ] 4.2 With the maintainer's go-ahead (token cost), run the default batch of 20 conversations with tracing on in the API and the simulator. Run the one-off Langfuse check from design decision 10 over the batch's conversation ids. Verify:
+- [x] 4.2 With the maintainer's go-ahead (token cost), run the default batch of 20 conversations with tracing on in the API and the simulator. Run the one-off Langfuse check from design decision 10 over the batch's conversation ids. Verify:
   - 20 sessions;
   - every trace has exactly one root, from `fornada-simulator`;
   - no observation points to a parent missing from its trace.
