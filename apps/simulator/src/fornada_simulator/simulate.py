@@ -99,7 +99,9 @@ async def run_conversation(
             messages.append(Message(role="customer", text=text))
             turns += 1
             try:
-                replies = await send_message(http, conversation_id, text)
+                replies = await send_message(
+                    http, conversation_id, text, persona_id=persona.id, run_id=run_id
+                )
             except ApiError:
                 outcome = "api_error"
                 break
