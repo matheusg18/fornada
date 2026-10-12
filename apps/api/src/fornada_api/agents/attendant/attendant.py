@@ -10,6 +10,9 @@ from uuid import UUID
 
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage
 from langgraph.graph.state import CompiledStateGraph
+from opentelemetry.trace import SpanKind, StatusCode
+
+from fornada_api.agents.attendant import tracing
 
 FALLBACK_REPLY = "Desculpe, não consegui responder agora. Pode repetir?"
 # About 12 model-tool rounds. Protects the token budget from a runaway tool
@@ -52,5 +55,30 @@ class GraphAttendant:
             "configurable": {"thread_id": str(conversation_id)},
             "recursion_limit": RECURSION_LIMIT,
         }
-        output = await self._graph.ainvoke({"messages": [HumanMessage(text)]}, config)
+        conversation = str(conversation_id)
+        # The turn span. Nodes run inside it, so `chat` and `execute_tool`
+        # spans become its children. Attributes known up front go in at
+        # creation, where samplers can see them.
+        with tracing.tracer.start_as_current_span(
+            f"{tracing.OP_INVOKE_AGENT} {tracing.AGENT_NAME}",
+            kind=SpanKind.INTERNAL,
+            attributes={
+                tracing.GEN_AI_OPERATION_NAME: tracing.OP_INVOKE_AGENT,
+                tracing.GEN_AI_AGENT_NAME: tracing.AGENT_NAME,
+                tracing.GEN_AI_CONVERSATION_ID: conversation,
+                tracing.SESSION_ID: conversation,
+            },
+            # The default status description is "Type: message", and a message
+            # can carry customer data. The status is set below, without one.
+            set_status_on_exception=False,
+        ) as span:
+            try:
+                output = await self._graph.ainvoke({"messages": [HumanMessage(text)]}, config)
+            except Exception as error:
+                span.set_status(StatusCode.ERROR)
+                span.set_attribute(tracing.ERROR_TYPE, type(error).__name__)
+                # Re-raised: leaving the `with` records the exception event once.
+                raise
+            # Known only after the graph ran: the version the model calls used.
+            span.set_attribute(tracing.FORNADA_PROMPT_VERSION, output["prompt_version"])
         return turn_replies(output["messages"]) or [FALLBACK_REPLY]

@@ -98,6 +98,46 @@ you get:
 - one CLIENT span per LLM HTTP call (the `httpx2` client under the Anthropic
   and OpenAI SDKs), in the same trace.
 
+### Agent spans
+
+The attendant makes its own spans by hand (`fornada_api/agents/attendant/`,
+names in `tracing.py`), following the OpenTelemetry GenAI semantic conventions.
+A turn looks like this:
+
+```
+POST /conversations/{conversation_id}/messages      SERVER   (FastAPI)
+└─ invoke_agent fornada-attendant                   INTERNAL (attendant.py)
+   ├─ chat claude-haiku-4-5                         CLIENT   (nodes.py, call_model)
+   │  └─ POST                                       CLIENT   (httpx2, the provider call)
+   ├─ execute_tool check_capacity                   INTERNAL (nodes.py, wrap_tool_call)
+   ├─ execute_tool calculate_quote                  INTERNAL (same round: siblings)
+   └─ chat claude-haiku-4-5                         CLIENT
+      └─ POST                                       CLIENT
+```
+
+| Span | Attributes |
+|---|---|
+| `invoke_agent fornada-attendant` | `gen_ai.operation.name`, `gen_ai.agent.name`, `gen_ai.conversation.id`, `session.id`, `fornada.prompt.version` |
+| `chat {model}` | `gen_ai.operation.name`, `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.response.id`, `gen_ai.response.finish_reasons`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `gen_ai.conversation.id`, `session.id`, `fornada.prompt.version` |
+| `execute_tool {tool}` | `gen_ai.operation.name`, `gen_ai.tool.name`, `gen_ai.tool.call.id`, `gen_ai.tool.type`, `gen_ai.conversation.id`, `session.id`; `check_capacity` adds `fornada.capacity.free_kg` |
+
+- Tokens are only on `chat` spans. Langfuse turns each `chat` into a
+  generation and prices it from the model name and usage; the turn and session
+  totals are Langfuse's sums.
+- No conversation content is recorded: no message text, system prompt, tool
+  arguments or tool results.
+- Status: an exception marks the span ERROR with `error.type` = the exception
+  class (and the turn span too, since the turn fails). A tool that returns an
+  error result marks only its `execute_tool` span (`error.type` =
+  `tool_error`): the model reads the error and the turn goes on. A full day is
+  not an error: `check_capacity` keeps an UNSET status and records
+  `fornada.capacity.free_kg = 0`. Status descriptions never carry exception
+  messages.
+
+**Sessions.** Every agent span carries the conversation id as `session.id`,
+which Langfuse maps to a session. Open Sessions in the Fornada project and
+search for the conversation id: the session lists one trace per turn.
+
 Spans are exported in batches, so they reach Langfuse about 5 s after the
 request (or at shutdown, which drains the queue). To see them, open
 http://localhost:3000, project Fornada → Tracing. The table lists every

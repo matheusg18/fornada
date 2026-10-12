@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from langchain_core.callbacks import CallbackManagerForLLMRun
+from langchain_core.language_models import LangSmithParams
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
@@ -22,6 +23,10 @@ class ScriptedChatModel(BaseChatModel):
     @property
     def _llm_type(self) -> str:
         return "scripted"
+
+    def _get_ls_params(self, stop: list[str] | None = None, **kwargs: Any) -> LangSmithParams:
+        # What `ChatAnthropic` reports, so spans name a real provider and model.
+        return LangSmithParams(ls_provider="anthropic", ls_model_name="claude-haiku-4-5")
 
     def bind_tools(self, tools: Sequence[Any], **kwargs: Any) -> Runnable[Any, Any]:
         self.bound_tools = list(tools)

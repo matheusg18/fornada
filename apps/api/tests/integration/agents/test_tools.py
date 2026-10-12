@@ -15,9 +15,14 @@ from langchain_core.tools import BaseTool
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode
+from opentelemetry.sdk.trace import ReadableSpan
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import StatusCode
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from fornada_api.agents.attendant import tracing
+from fornada_api.agents.attendant.nodes import wrap_tool_call
 from fornada_api.agents.attendant.tools import build_tools
 from fornada_api.models import Customer, Escalation, Order, OrderStatus, SentMessage
 from fornada_api.services.clock import SystemClock
@@ -34,7 +39,8 @@ class ToolRunner:
 
     def __init__(self, tools: list[BaseTool]) -> None:
         graph = StateGraph(MessagesState)
-        graph.add_node("tools", ToolNode(tools))
+        # The production wrapper, so tools run inside their `execute_tool` span.
+        graph.add_node("tools", ToolNode(tools, awrap_tool_call=wrap_tool_call))
         graph.add_edge(START, "tools")
         graph.add_edge("tools", END)
         self.graph: CompiledStateGraph[Any, Any, Any, Any] = graph.compile()
@@ -121,6 +127,34 @@ async def test_full_day(run: ToolRunner, full_day: dt.date) -> None:
     report = await run.ok("check_capacity", date=full_day.isoformat())
     assert (report["capacity_kg"], report["used_kg"], report["free_kg"]) == ("15.0", "15.0", "0.0")
     assert report["date"] == full_day.isoformat()
+
+
+def capacity_span(exporter: InMemorySpanExporter) -> ReadableSpan:
+    (span,) = [s for s in exporter.get_finished_spans() if s.name == "execute_tool check_capacity"]
+    return span
+
+
+async def test_full_day_is_not_a_span_error(
+    run: ToolRunner, full_day: dt.date, spans: InMemorySpanExporter
+) -> None:
+    await run.ok("check_capacity", date=full_day.isoformat())
+
+    span = capacity_span(spans)
+    assert span.status.status_code is StatusCode.UNSET
+    assert (span.attributes or {})[tracing.FORNADA_CAPACITY_FREE_KG] == 0.0
+
+
+async def test_day_with_room_records_its_free_kg(
+    run: ToolRunner, spans: InMemorySpanExporter
+) -> None:
+    far = TODAY + 60 * DAY
+    report = await run.ok("check_capacity", date=far.isoformat())
+
+    span = capacity_span(spans)
+    assert span.status.status_code is StatusCode.UNSET
+    free_kg = (span.attributes or {})[tracing.FORNADA_CAPACITY_FREE_KG]
+    assert isinstance(free_kg, float)
+    assert free_kg == float(report["free_kg"]) > 0
 
 
 async def test_tomorrow_meets_no_lead_time(run: ToolRunner) -> None:

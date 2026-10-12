@@ -1,3 +1,5 @@
+"""Shared unit-test fixtures. Span fixtures live in `tests/conftest.py`."""
+
 import pytest
 
 
