@@ -15,9 +15,9 @@
   - no message text in any attribute;
   - ERROR on 500, connect failure and bad body, UNSET on 200;
   - no header when tracing is off.
-- [ ] 2.5 Make `run_batch` flush the global SDK provider before returning, and make `__main__` set tracing up from settings and shut it down in a `finally`. Verify with a test: after `run_batch` returns, the in-memory exporter already holds every client span. A second test runs two conversations at concurrency 2 and checks their trace ids are disjoint.
-- [ ] 2.6 Move the notebook to `httpx2` and set tracing up in its first cell. Verify the notebook runs one conversation against the dev API with tracing on, and commit it with outputs cleared.
-- [ ] 2.7 Document tracing in `apps/simulator/README.md`: variables, span shape, flush behavior. Verify `uv run task check` passes in `apps/simulator`.
+- [x] 2.5 Make `run_batch` flush the global SDK provider before returning, and make `__main__` set tracing up from settings and shut it down in a `finally`. Verify with a test: after `run_batch` returns, the in-memory exporter already holds every client span. A second test runs two conversations at concurrency 2 and checks their trace ids are disjoint.
+- [x] 2.6 Move the notebook to `httpx2` and set tracing up in its first cell. Verify the notebook runs one conversation against the dev API with tracing on, and commit it with outputs cleared.
+- [x] 2.7 Document tracing in `apps/simulator/README.md`: variables, span shape, flush behavior. Verify `uv run task check` passes in `apps/simulator`.
 
 ## 3. Chat tracing
 
