@@ -10,7 +10,7 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     import os
 
     for name in list(os.environ):
-        if name.upper().startswith("SIMULATOR__"):
+        if name.upper().startswith(("SIMULATOR__", "TELEMETRY__")):
             monkeypatch.delenv(name)
 
 
@@ -61,3 +61,26 @@ def test_errors_never_contain_the_key(monkeypatch: pytest.MonkeyPatch) -> None:
         load()
     assert "SIMULATOR__MAX_TURNS" in str(info.value)
     assert KEY not in str(info.value)
+
+
+def test_telemetry_is_off_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SIMULATOR__ANTHROPIC__API_KEY", KEY)
+    telemetry = load().telemetry
+    assert telemetry.enabled is False
+    assert telemetry.otlp_endpoint == "http://edot-collector:4318"
+
+
+def test_telemetry_reads_the_shared_variables(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SIMULATOR__ANTHROPIC__API_KEY", KEY)
+    monkeypatch.setenv("TELEMETRY__ENABLED", "true")
+    monkeypatch.setenv("TELEMETRY__OTLP_ENDPOINT", "http://collector:4318/")
+    telemetry = load().telemetry
+    assert telemetry.enabled is True
+    assert telemetry.otlp_endpoint == "http://collector:4318"
+
+
+def test_invalid_otlp_endpoint_names_the_variable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SIMULATOR__ANTHROPIC__API_KEY", KEY)
+    monkeypatch.setenv("TELEMETRY__OTLP_ENDPOINT", "edot-collector:4318")
+    with pytest.raises(ConfigError, match="TELEMETRY__OTLP_ENDPOINT: must be an http"):
+        load()

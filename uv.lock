@@ -989,6 +989,8 @@ dependencies = [
     { name = "httpx2" },
     { name = "langchain-anthropic" },
     { name = "langchain-openai" },
+    { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-sdk" },
     { name = "pydantic-settings" },
 ]
 
@@ -1009,6 +1011,8 @@ requires-dist = [
     { name = "httpx2", specifier = ">=2.13.1" },
     { name = "langchain-anthropic", specifier = ">=1.7.5" },
     { name = "langchain-openai", specifier = ">=1.6.7" },
+    { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.45.1" },
+    { name = "opentelemetry-sdk", specifier = ">=1.45.1" },
     { name = "pydantic-settings", specifier = ">=2.15.0" },
 ]
 
