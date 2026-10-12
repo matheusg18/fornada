@@ -19,6 +19,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from fornada_simulator.client import ApiError, send_message
 from fornada_simulator.personas import PERSONAS, Persona
 from fornada_simulator.settings import SimulatorSettings
+from fornada_simulator.telemetry import flush_tracing
 from fornada_simulator.transcript import Message, Outcome, Transcript, append_jsonl
 
 logger = logging.getLogger(__name__)
@@ -162,7 +163,11 @@ async def run_batch(
     run_id: str | None = None,
     transport: httpx2.AsyncBaseTransport | None = None,
 ) -> list[Transcript]:
-    """Run the planned conversations; each transcript is appended as it finishes."""
+    """Run the planned conversations; each transcript is appended as it finishes.
+
+    Buffered spans are exported before it returns, so a caller that exits right
+    after (the CLI, a notebook cell) leaves no trace without its root.
+    """
     run_id = run_id or new_run_id()
     path = runs_dir / f"{run_id}.jsonl"
     semaphore = asyncio.Semaphore(settings.concurrency)
@@ -180,4 +185,7 @@ async def run_batch(
             return transcript
 
         jobs = plan_jobs(settings.runs_per_persona)
-        return list(await asyncio.gather(*(one(persona, goal) for persona, goal in jobs)))
+        try:
+            return list(await asyncio.gather(*(one(persona, goal) for persona, goal in jobs)))
+        finally:
+            flush_tracing()
