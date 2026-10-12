@@ -957,6 +957,8 @@ source = { editable = "apps/chat" }
 dependencies = [
     { name = "chainlit" },
     { name = "httpx2" },
+    { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-sdk" },
 ]
 
 [package.dev-dependencies]
@@ -971,6 +973,8 @@ dev = [
 requires-dist = [
     { name = "chainlit", specifier = ">=2.12.0" },
     { name = "httpx2", specifier = ">=2.13.1" },
+    { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.45.1" },
+    { name = "opentelemetry-sdk", specifier = ">=1.45.1" },
 ]
 
 [package.metadata.requires-dev]

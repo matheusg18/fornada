@@ -1,17 +1,40 @@
 """Chainlit entry point: a thin layer over `client.send_message`."""
 
+import os
 from uuid import UUID, uuid4
 
 import chainlit as cl
 import httpx2
 
-from fornada_chat.client import API_URL, ERROR_MESSAGE, ApiError, send_message
+from fornada_chat.client import (
+    API_URL,
+    ERROR_MESSAGE,
+    ApiError,
+    send_message,
+    use_tracer_provider,
+)
+from fornada_chat.telemetry import load_telemetry_settings, setup_tracing, shutdown_tracing
 
 # A real agent turn can chain several LLM and tool calls, so wait longer than
 # httpx2's 5 s default.
 REQUEST_TIMEOUT_SECONDS = 60
 
 CONVERSATION_ID_KEY = "conversation_id"
+
+
+@cl.on_app_startup
+def start_tracing() -> None:
+    # Before any message. The provider stays private to the chat, so
+    # Chainlit's own FastAPI server makes no spans (telemetry.py).
+    provider = setup_tracing(load_telemetry_settings(os.environ))
+    if provider is not None:
+        use_tracer_provider(provider)
+
+
+@cl.on_app_shutdown
+def stop_tracing() -> None:
+    # Drains the span queue.
+    shutdown_tracing()
 
 
 @cl.on_chat_start
