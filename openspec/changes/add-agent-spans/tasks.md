@@ -10,7 +10,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "which spans and attrib
 
 ## 2. Turn span (`invoke_agent`)
 
-- [ ] 2.1 Write failing unit tests in `tests/unit/agents/test_agent_tracing.py` (scripted model, `spans` fixture, graph compiled with an in-memory checkpointer). Cover the `agent-tracing` scenarios:
+- [x] 2.1 Write failing unit tests in `tests/unit/agents/test_agent_tracing.py` (scripted model, `spans` fixture, graph compiled with an in-memory checkpointer). Cover the `agent-tracing` scenarios:
   - one `invoke_agent fornada-attendant` span per turn, kind INTERNAL, with operation and agent name, and no provider or model attribute;
   - `gen_ai.conversation.id` and `session.id` equal to the conversation id;
   - `fornada.prompt.version` from the turn output;
@@ -19,7 +19,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "which spans and attrib
   - the same replies and stored messages with the no-op provider.
 
   Verify they fail.
-- [ ] 2.2 TODO(human): create the `invoke_agent` span around `graph.ainvoke` in `GraphAttendant.reply` (design.md, decision 8.1). The agent leaves the marker and a Learn by Doing note in `attendant.py`. Verify the 2.1 tests pass.
+- [x] 2.2 TODO(human): create the `invoke_agent` span around `graph.ainvoke` in `GraphAttendant.reply` (design.md, decision 8.1). The agent leaves the marker and a Learn by Doing note in `attendant.py`. Verify the 2.1 tests pass.
 
 ## 3. Model span (`chat`)
 
