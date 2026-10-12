@@ -8,7 +8,7 @@ import pytest
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.outputs import ChatResult
-from langchain_core.tools import tool
+from langchain_core.tools import ToolException, tool
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 from opentelemetry import trace
@@ -44,8 +44,34 @@ async def search_catalog() -> str:
     return "bolo-chocolate"
 
 
+@tool
+async def check_capacity(date: str) -> str:
+    """Free kg on a date."""
+    return "5 kg"
+
+
+@tool
+async def calculate_quote(weight_kg: float) -> str:
+    """Prices a cake."""
+    if weight_kg % 0.5:
+        raise ToolException("weight must be in steps of 0.5 kg")
+    return "224.75"
+
+
+calculate_quote.handle_tool_error = True
+
+
+@tool
+async def get_order(order_id: int, phone: str) -> str:
+    """An order's status; echoes the phone, as the real tool returns customer data."""
+    return f"pedido {order_id} do telefone {phone}: confirmado"
+
+
+TOOLS = [search_catalog, check_capacity, calculate_quote, get_order]
+
+
 def build(model: ScriptedChatModel) -> tuple[GraphAttendant, Any]:
-    graph = build_graph(model, [search_catalog], PROMPT).compile(checkpointer=InMemorySaver())
+    graph = build_graph(model, TOOLS, PROMPT).compile(checkpointer=InMemorySaver())
     return GraphAttendant(graph), graph
 
 
@@ -319,3 +345,136 @@ def test_langchain_models_report_provider_and_model() -> None:
     ]:
         params = model._get_ls_params()
         assert (params.get("ls_provider"), params.get("ls_model_name")) == (provider, name)
+
+
+# --- tool spans ----------------------------------------------------------------
+
+
+def tool_spans(exporter: InMemorySpanExporter) -> list[ReadableSpan]:
+    return [s for s in exporter.get_finished_spans() if s.name.startswith("execute_tool ")]
+
+
+def calls(*pairs: tuple[str, dict[str, Any], str]) -> AIMessage:
+    """One model answer that requests several tools at once."""
+    return AIMessage(content="", tool_calls=[{"name": n, "args": a, "id": i} for n, a, i in pairs])
+
+
+async def test_one_internal_tool_span_per_call(spans: InMemorySpanExporter) -> None:
+    model = ScriptedChatModel(
+        answers=[tool_call("search_catalog", {}, "toolu_01"), AIMessage("ok")]
+    )
+    agent, _ = build(model)
+    conversation = uuid.uuid4()
+    await agent.reply(conversation, "catálogo")
+
+    (turn,) = turn_spans(spans)
+    (span,) = tool_spans(spans)
+    assert turn.context is not None and span.parent is not None
+    assert span.name == "execute_tool search_catalog"
+    assert span.kind is SpanKind.INTERNAL
+    assert span.parent.span_id == turn.context.span_id
+    assert attrs(span) == {
+        tracing.GEN_AI_OPERATION_NAME: "execute_tool",
+        tracing.GEN_AI_TOOL_NAME: "search_catalog",
+        tracing.GEN_AI_TOOL_CALL_ID: "toolu_01",
+        tracing.GEN_AI_TOOL_TYPE: "function",
+        tracing.GEN_AI_CONVERSATION_ID: str(conversation),
+        tracing.SESSION_ID: str(conversation),
+    }
+    assert span.status.status_code is StatusCode.UNSET
+
+
+async def test_two_tools_in_one_answer_are_siblings(spans: InMemorySpanExporter) -> None:
+    both = calls(
+        ("check_capacity", {"date": "2026-10-20"}, "c1"),
+        ("calculate_quote", {"weight_kg": 2.0}, "c2"),
+    )
+    agent, _ = build(ScriptedChatModel(answers=[both, AIMessage("ok")]))
+    await agent.reply(uuid.uuid4(), "orçamento")
+
+    (turn,) = turn_spans(spans)
+    found = {s.name: s for s in tool_spans(spans)}
+    assert set(found) == {"execute_tool check_capacity", "execute_tool calculate_quote"}
+    assert attrs(found["execute_tool check_capacity"])[tracing.GEN_AI_TOOL_CALL_ID] == "c1"
+    assert attrs(found["execute_tool calculate_quote"])[tracing.GEN_AI_TOOL_CALL_ID] == "c2"
+    assert turn.context is not None
+    for span in found.values():
+        assert span.parent is not None
+        assert span.parent.span_id == turn.context.span_id
+
+
+async def test_waterfall_follows_the_graph(spans: InMemorySpanExporter) -> None:
+    model = ScriptedChatModel(
+        answers=[
+            tool_call("check_capacity", {"date": "2026-10-20"}, "c1"),
+            tool_call("calculate_quote", {"weight_kg": 2.0}, "c2"),
+            AIMessage("Fica R$ 224,75"),
+        ]
+    )
+    agent, _ = build(model)
+    await agent.reply(uuid.uuid4(), "quanto fica?")
+
+    (turn,) = turn_spans(spans)
+    assert turn.context is not None
+    children = sorted(
+        (
+            s
+            for s in spans.get_finished_spans()
+            if s.parent is not None and s.parent.span_id == turn.context.span_id
+        ),
+        key=lambda s: s.start_time or 0,
+    )
+    assert [s.name for s in children] == [
+        CHAT_SPAN,
+        "execute_tool check_capacity",
+        CHAT_SPAN,
+        "execute_tool calculate_quote",
+        CHAT_SPAN,
+    ]
+    # Each tool starts after the model call that requested it has ended.
+    for chat, tool_span in [(children[0], children[1]), (children[2], children[3])]:
+        assert (chat.end_time or 0) <= (tool_span.start_time or 0)
+
+
+async def test_tool_error_result_marks_only_the_tool_span(spans: InMemorySpanExporter) -> None:
+    model = ScriptedChatModel(
+        answers=[tool_call("calculate_quote", {"weight_kg": 2.3}, "c1"), AIMessage("Use 2,5 kg")]
+    )
+    agent, _ = build(model)
+    await agent.reply(uuid.uuid4(), "2,3 kg")
+
+    (span,) = tool_spans(spans)
+    assert span.status.status_code is StatusCode.ERROR
+    assert attrs(span)[tracing.ERROR_TYPE] == "tool_error"
+    # The status says nothing of the tool's message, which can hold customer data.
+    assert not span.status.description
+    (turn,) = turn_spans(spans)
+    assert turn.status.status_code is StatusCode.UNSET
+
+
+async def test_invalid_tool_arguments_mark_the_tool_span(spans: InMemorySpanExporter) -> None:
+    model = ScriptedChatModel(
+        answers=[tool_call("calculate_quote", {"weight_kg": "dois"}, "c1"), AIMessage("ok")]
+    )
+    agent, _ = build(model)
+    await agent.reply(uuid.uuid4(), "orçamento")
+
+    (span,) = tool_spans(spans)
+    assert span.status.status_code is StatusCode.ERROR
+    assert attrs(span)[tracing.ERROR_TYPE] == "tool_error"
+
+
+async def test_tool_spans_carry_no_arguments_or_results(spans: InMemorySpanExporter) -> None:
+    model = ScriptedChatModel(
+        answers=[
+            tool_call("get_order", {"order_id": 482, "phone": "11 98765-4321"}, "c1"),
+            AIMessage("ok"),
+        ]
+    )
+    agent, _ = build(model)
+    await agent.reply(uuid.uuid4(), "meu pedido 482, telefone 11 98765-4321")
+
+    for span in spans.get_finished_spans():
+        values = " ".join(str(v) for v in attrs(span).values())
+        assert "98765-4321" not in values, span.name
+        assert "confirmado" not in values, span.name

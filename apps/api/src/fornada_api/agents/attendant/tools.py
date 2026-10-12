@@ -20,14 +20,16 @@ from typing import Annotated, Any, Literal
 
 from langchain_core.tools import BaseTool, ToolException, tool
 from langgraph.prebuilt import ToolRuntime
+from opentelemetry import trace
 from pydantic import Field
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from fornada_api import repositories
+from fornada_api.agents.attendant import tracing
 from fornada_api.core.config import get_settings
 from fornada_api.infrastructure.engine import get_sessionmaker
 from fornada_api.models import Fulfillment
-from fornada_api.services.capacity import CapacityService
+from fornada_api.services.capacity import CapacityReport, CapacityService
 from fornada_api.services.catalog import CatalogService
 from fornada_api.services.clock import Clock, SystemClock
 from fornada_api.services.coupons import CouponService
@@ -136,7 +138,18 @@ def build_tools(
     ) -> dict[str, Any]:
         """Free oven capacity in kg on a date, and whether the date meets the minimum
         lead time for regular and custom cakes."""
-        return await run("check_capacity", lambda s: s.capacity.check(date))
+
+        async def check(s: Services) -> CapacityReport:
+            report = await s.capacity.check(date)
+            # On the `execute_tool` span the graph's wrapper opened. A full day
+            # is a valid answer, not an error: the span keeps its status and
+            # records the number (agent-tracing spec, "A full day is not an error").
+            trace.get_current_span().set_attribute(
+                tracing.FORNADA_CAPACITY_FREE_KG, float(report.free_kg)
+            )
+            return report
+
+        return await run("check_capacity", check)
 
     @tool
     async def calculate_quote(

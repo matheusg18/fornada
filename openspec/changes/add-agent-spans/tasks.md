@@ -40,8 +40,8 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "which spans and attrib
 
 ## 4. Tool spans (`execute_tool`) and the full-day rule
 
-- [ ] 4.1 Add an `awrap_tool_call` hook to the `ToolNode` in `build_graph` that, for now, only calls the handler (design.md, decision 2). Verify existing graph and tool tests pass unchanged.
-- [ ] 4.2 Write failing unit tests:
+- [x] 4.1 Add an `awrap_tool_call` hook to the `ToolNode` in `build_graph` that, for now, only calls the handler (design.md, decision 2). Verify existing graph and tool tests pass unchanged.
+- [x] 4.2 Write failing unit tests:
   - one `execute_tool {name}` span per call, kind INTERNAL, child of `invoke_agent`, with tool name, call id, `gen_ai.tool.type=function`, and conversation and session ids;
   - two calls in one answer give two sibling spans with their own call ids;
   - the waterfall order chat → tools → chat by start time;
@@ -49,9 +49,9 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "which spans and attrib
   - no tool arguments or results on any span.
 
   Use stub tools in the scripted graph. Verify they fail.
-- [ ] 4.3 TODO(human): create the `execute_tool` span in the wrapper and decide the status rule and `error.type` value for error results (design.md, decisions 7 and 8.3). Verify the 4.2 tests pass.
-- [ ] 4.4 Write failing tests for the full-day rule. With a fake capacity service (or the real tool over the existing service fakes), `check_capacity` for a date with 0 kg free gives an UNSET `execute_tool check_capacity` span with `fornada.capacity.free_kg = 0.0`, and a date with 6.5 kg free gives `6.5`. Verify they fail.
-- [ ] 4.5 TODO(human): set `fornada.capacity.free_kg` on the current span inside the `check_capacity` tool, and decide whether the lead-time flags also become attributes (design.md, decisions 7 and 8.4). Verify the 4.4 tests pass and `uv run task check` passes.
+- [x] 4.3 TODO(human): create the `execute_tool` span in the wrapper and decide the status rule and `error.type` value for error results (design.md, decisions 7 and 8.3). Verify the 4.2 tests pass.
+- [x] 4.4 Write failing tests for the full-day rule. With a fake capacity service (or the real tool over the existing service fakes), `check_capacity` for a date with 0 kg free gives an UNSET `execute_tool check_capacity` span with `fornada.capacity.free_kg = 0.0`, and a date with 6.5 kg free gives `6.5`. Verify they fail.
+- [x] 4.5 TODO(human): set `fornada.capacity.free_kg` on the current span inside the `check_capacity` tool, and decide whether the lead-time flags also become attributes (design.md, decisions 7 and 8.4). Verify the 4.4 tests pass and `uv run task check` passes.
 
 ## 5. Docs and end-to-end check
 

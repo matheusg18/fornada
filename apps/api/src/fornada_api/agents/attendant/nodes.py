@@ -1,12 +1,15 @@
-"""The graph's model node. The tool node is LangGraph's prebuilt `ToolNode`."""
+"""The graph's model node, and the wrapper around each call of LangGraph's
+prebuilt `ToolNode`."""
 
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
+from langgraph.prebuilt.tool_node import ToolCallRequest
+from langgraph.types import Command
 from opentelemetry.trace import Span, SpanKind, StatusCode
 
 from fornada_api.agents.attendant import tracing
@@ -92,3 +95,57 @@ def set_response_attributes(span: Span, answer: BaseMessage) -> None:
         # semconv asks; no cache attributes (design.md, decision 6).
         span.set_attribute(tracing.GEN_AI_USAGE_INPUT_TOKENS, usage["input_tokens"])
         span.set_attribute(tracing.GEN_AI_USAGE_OUTPUT_TOKENS, usage["output_tokens"])
+
+
+ToolHandler = Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]]
+
+
+# `error.type` for a tool call that came back as an error result. One value:
+# the wrapper only sees `ToolMessage.status`, and telling a domain error from
+# invalid arguments would mean reading the message text, which can hold
+# customer data. The text stays in the conversation, for error analysis.
+TOOL_ERROR = "tool_error"
+
+
+async def wrap_tool_call(request: ToolCallRequest, handler: ToolHandler) -> ToolMessage | Command:
+    """The `execute_tool` span around each tool call `ToolNode` makes.
+
+    It runs in that call's own task, so concurrent calls of one model answer
+    get sibling spans, each a child of the turn span. Tools see this span as
+    the current one, so a tool can add its own attributes to it.
+    """
+    call = request.tool_call
+    name = call["name"]
+    attributes = {
+        tracing.GEN_AI_OPERATION_NAME: tracing.OP_EXECUTE_TOOL,
+        tracing.GEN_AI_TOOL_NAME: name,
+        tracing.GEN_AI_TOOL_TYPE: tracing.TOOL_TYPE_FUNCTION,
+    }
+    if call_id := call.get("id"):
+        attributes[tracing.GEN_AI_TOOL_CALL_ID] = call_id
+    thread_id = (request.runtime.config.get("configurable") or {}).get("thread_id")
+    if thread_id is not None:
+        attributes[tracing.GEN_AI_CONVERSATION_ID] = str(thread_id)
+        attributes[tracing.SESSION_ID] = str(thread_id)
+
+    with tracing.tracer.start_as_current_span(
+        f"{tracing.OP_EXECUTE_TOOL} {name}",
+        kind=SpanKind.INTERNAL,
+        attributes=attributes,
+        set_status_on_exception=False,
+    ) as span:
+        try:
+            result = await handler(request)
+        except Exception as error:
+            # Rare: our tools turn their errors into error results. Anything
+            # else still reaches here and fails the turn.
+            span.set_status(StatusCode.ERROR)
+            span.set_attribute(tracing.ERROR_TYPE, type(error).__name__)
+            raise
+        # A result, not an exception, is how tools fail here (`handle_tool_error`
+        # and ToolNode's argument validation). The turn goes on: the model reads
+        # the error, so only this span is marked.
+        if isinstance(result, ToolMessage) and result.status == "error":
+            span.set_status(StatusCode.ERROR)
+            span.set_attribute(tracing.ERROR_TYPE, TOOL_ERROR)
+        return result
