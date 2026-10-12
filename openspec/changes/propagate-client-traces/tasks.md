@@ -21,11 +21,12 @@
 
 ## 3. Chat tracing
 
-- [ ] 3.1 Add the same two OpenTelemetry packages to `fornada-chat` with `uv add --package`, and verify `uv sync` succeeds.
-- [ ] 3.2 Add `fornada_chat/telemetry.py`: settings from `TELEMETRY__ENABLED` and `TELEMETRY__OTLP_ENDPOINT` in `os.environ`, `build_tracer_provider` with a `TODO(human)` suggestion for the provider (resource `fornada-chat`), and an idempotent `setup_tracing`. Verify with unit tests for default-off, the endpoint and the resource.
-- [ ] 3.3 Wrap the `POST` in the chat's `client.send_message` in the same CLIENT span and inject. Session and conversation attributes; no persona. Same error mapping as the simulator. Verify with unit tests mirroring 2.4, minus the persona.
-- [ ] 3.4 Register `@cl.on_app_startup` (setup) and `@cl.on_app_shutdown` (shutdown) in `app.py`. Verify by starting `uv run task dev` with tracing on, sending one message in the browser through Playwright, and finding a `fornada-chat` root with the API's spans under it in Langfuse.
-- [ ] 3.5 Document tracing in `apps/chat/README.md`: the variables, and that `LITERAL_API_KEY` is unsupported because it turns Traceloop on. Verify `uv run task check` passes in `apps/chat`.
+- [x] 3.1 Add the same two OpenTelemetry packages to `fornada-chat` with `uv add --package`, and verify `uv sync` succeeds.
+- [x] 3.2 Add `fornada_chat/telemetry.py`: settings from `TELEMETRY__ENABLED` and `TELEMETRY__OTLP_ENDPOINT` in `os.environ`, and `build_tracer_provider` mirroring the simulator (resource `fornada-chat`). `setup_tracing` keeps one private provider per process and never registers it globally (design decision 11). Verify with unit tests for default-off, the endpoint, the resource, and the global provider left untouched.
+- [x] 3.3 Wrap the `POST` in the chat's `client.send_message` in the same CLIENT span and inject. Session and conversation attributes; no persona. Same error mapping as the simulator. The tracer comes from the private provider. Verify with unit tests mirroring 2.4, minus the persona.
+- [x] 3.6 Start both clients' spans from an empty parent context (design decision 11). Verify with a test in each app that posts inside an outer span and gets a client span with no parent.
+- [x] 3.4 Register `@cl.on_app_startup` (setup) and `@cl.on_app_shutdown` (shutdown) in `app.py`. Verify by starting `uv run task dev` with tracing on, sending one message in the browser through Playwright, and finding a `fornada-chat` root with the API's spans under it in Langfuse, and no `WS` or other Chainlit span from `fornada-chat`.
+- [x] 3.5 Document tracing in `apps/chat/README.md`: the variables, and that `LITERAL_API_KEY` is unsupported because it turns Traceloop on. Verify `uv run task check` passes in `apps/chat`.
 
 ## 4. Configuration and end-to-end check
 

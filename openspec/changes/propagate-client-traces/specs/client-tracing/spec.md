@@ -39,6 +39,17 @@ With tracing enabled, each customer message the chat or the simulator posts SHAL
 - **WHEN** a simulated conversation posts three messages
 - **THEN** three client spans are exported, each with a different trace id
 
+#### Scenario: Root even inside another span
+- **WHEN** a client posts a message while another span is current in its process
+- **THEN** the client span still has no parent and starts a new trace
+
+### Requirement: The chat traces only its posts
+With tracing enabled, the chat SHALL export only its client spans. Chainlit's own server work, such as the websocket connection and HTTP requests for the UI, SHALL NOT produce spans.
+
+#### Scenario: Chat tab open
+- **WHEN** a person opens the chat, sends two messages and closes the tab
+- **THEN** the chat exports exactly two spans, both client spans, in two different traces
+
 ### Requirement: Clients propagate trace context to the API
 With tracing enabled, each posted message SHALL carry a W3C `traceparent` header for its client span, so the API's spans for that turn join the client's trace.
 

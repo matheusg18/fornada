@@ -9,6 +9,7 @@
   - The chat reads `CHAT__API_URL` straight from `os.environ`. Chainlit loads `apps/chat/.env`, not the root one.
 - The simulator's persona model is `ChatAnthropic` or `ChatOpenAI`, whose SDKs also use `httpx2`.
 - The notebook's single-conversation cell builds a plain `httpx.AsyncClient`. It works only because `send_message` uses no API that is specific to `httpx2`.
+- Chainlit 2.12 builds its own FastAPI app (`chainlit/server.py`). FastAPI 0.143 traces every request through the **global** provider by default, and no environment variable turns that off. Found at apply: with the chat's provider registered globally, the socket.io websocket became a `WS /ws/socket.io/{path}` span open for the whole tab. Each message ran inside it, so a tab was one trace whose root arrived only on disconnect. See decision 11.
 - Chainlit 2.12 pulls in `literalai` → `traceloop-sdk`. `Traceloop.init` runs only when the Literal AI data layer is configured (`LITERAL_API_KEY`), which this project never sets. So the chat process gets no OpenTelemetry provider of its own.
 - Langfuse v4 queries observations, not traces. An attribute filters or groups an observation only when that span carries it. So `session.id` must be on the client root span too, not only on the agent's spans.
 
@@ -83,6 +84,15 @@
 - `trace.set_tracer_provider` works once per process. Re-running the notebook's setup cell, or Chainlit's reload (`-w`), must not stack providers.
 - `setup_tracing` returns the provider already registered when there is one, so spans are not lost to a second provider that is never registered.
 
+### 11. The chat keeps its provider private, and client spans are always roots (found at apply)
+- The chat does not call `trace.set_tracer_provider`. `setup_tracing` builds the provider once per process and keeps it in the telemetry module. The startup hook hands it to `client.py`, whose tracer is a no-op until then.
+  - With the global provider left unconfigured, Chainlit's FastAPI telemetry creates no spans, and neither would any other library in the process (Traceloop through `literalai`).
+  - This departs from decisions 6 and 9 for the chat only: the API and the simulator own their whole process, while the chat shares its process with Chainlit.
+- Both clients start their span with an empty parent context (`context=Context()`), so the span is a root whatever span happens to be current. That keeps the "one trace per turn" shape safe from any future ambient span, in the simulator too.
+- **Alternatives:**
+  - Only the empty parent: each message is a root again, but every tab still exports a `WS` span, which shows up as an extra trace with no session and no cost.
+  - Only the private provider: no `WS` span, but a root then depends on there being no current span, an assumption nobody would notice breaking.
+
 ### 10. Verification of "done when"
 - Run the default batch (20 conversations) with tracing on in all three apps. Then, for each conversation id in the batch JSONL, query Langfuse `/api/public/v2/observations?sessionId=<id>` and check:
   - every observation has the same `sessionId`;
@@ -95,7 +105,7 @@
 - **[A Collector or Langfuse outage drops client roots but not API spans, leaving the API spans without a root]** → Same pipeline for both, so they fail together. The verification step counts orphan observations.
 - **[The default batch costs tokens: about 20 conversations × up to 12 turns, agent + persona]** → Run it once, at the end, after asking the maintainer. Earlier checks use one conversation.
 - **[Turns run at concurrency > 1 interleave in one process]** → The span context lives in contextvars, so each `asyncio` task has its own current span. A test runs two conversations concurrently and checks the trace ids are disjoint.
-- **[Chainlit's `literalai` turns Traceloop on if `LITERAL_API_KEY` is ever set]** → It would register a second pipeline. The design note above and the chat README name the variable as unsupported.
+- **[Chainlit's `literalai` turns Traceloop on if `LITERAL_API_KEY` is ever set]** → Traceloop registers its own global provider, so Chainlit's FastAPI spans and Traceloop's would appear. The chat's spans are unaffected (private provider, decision 11). The chat README names the variable as unsupported.
 - **[Client clock skew against the API container]** → Same dev container and same clock today. Accepted.
 
 ## Migration Plan
