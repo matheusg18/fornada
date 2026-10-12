@@ -14,6 +14,7 @@ from uuid import UUID
 
 import httpx2
 from opentelemetry import propagate, trace
+from opentelemetry.context import Context
 from opentelemetry.trace import Span, SpanKind
 from opentelemetry.trace.status import StatusCode
 
@@ -106,6 +107,8 @@ async def send_message(
         SPAN_NAME,
         kind=SpanKind.CLIENT,
         attributes=request_attributes(http, conversation_id, persona_id, run_id),
+        # Always a root: one trace per turn, whatever span is current.
+        context=Context(),
         # The default description is the exception message; `mark_failed`
         # sets the status without one.
         set_status_on_exception=False,

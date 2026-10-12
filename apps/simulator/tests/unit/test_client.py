@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import httpx2
 import pytest
+from opentelemetry import trace
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import NoOpTracer, SpanKind, StatusCode
@@ -190,6 +191,15 @@ async def test_other_failures_mark_the_span_as_an_error(
     assert span.status.status_code is StatusCode.ERROR
     assert span.status.description is None
     assert attrs(span)["error.type"]
+
+
+async def test_client_span_is_a_root_inside_another_span(spans: InMemorySpanExporter) -> None:
+    with trace.get_tracer("test").start_as_current_span("outer"):
+        async with make_client(httpx2.MockTransport(ok)) as http:
+            await send_message(http, uuid4(), "oi")
+
+    (span,) = client_spans(spans)
+    assert span.parent is None
 
 
 async def test_no_traceparent_when_tracing_is_off(monkeypatch: pytest.MonkeyPatch) -> None:
