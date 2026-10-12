@@ -55,21 +55,21 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "which spans and attrib
 
 ## 5. Docs and end-to-end check
 
-- [ ] 5.1 Update `apps/api/README.md` ("Tracing"):
+- [x] 5.1 Update `apps/api/README.md` ("Tracing"):
   - the agent span tree (`invoke_agent` → `chat` / `execute_tool`, the httpx2 span under `chat`);
   - the attributes each span carries, and that no conversation text is recorded;
   - how to open a conversation's session in Langfuse (Sessions, filtered by the conversation id);
   - the full-day status rule.
 
   Verify every attribute in the spec appears in the README.
-- [ ] 5.2 Maintainer predicts in one sentence the waterfall Langfuse will show for "Quero um bolo de chocolate de 2 kg para sábado, dá?". Then, with tracing on, run `uv run task dev` and post 3 messages to one conversation id, so that one turn calls `check_capacity` for a full date (insert or reuse a seeded full date). In Langfuse (http://localhost:3000, project Fornada) confirm:
+- [x] 5.2 Maintainer predicts in one sentence the waterfall Langfuse will show for "Quero um bolo de chocolate de 2 kg para sábado, dá?". Then, with tracing on, run `uv run task dev` and post 3 messages to one conversation id, so that one turn calls `check_capacity` for a full date (insert or reuse a seeded full date). In Langfuse (http://localhost:3000, project Fornada) confirm:
   - each trace's waterfall matches the graph (agent → chat → tool(s) → chat, with the HTTP span under its chat);
   - each generation shows model, tokens and a non-zero cost;
   - the three traces sit in one session named by the conversation id;
   - the full-day `check_capacity` observation is not marked as an error and shows `fornada.capacity.free_kg = 0`.
 
   This is the "Pronto quando". Compare with the prediction. If cost is 0, add a custom model definition in the dev Langfuse project and document it in the README (design.md, Risks).
-- [ ] 5.3 Agent, in the dev container: before and after 5.2, read `curl -s edot-collector:8888/metrics | grep spans` and confirm `otelcol_exporter_sent_spans{exporter="otlphttp/langfuse"}` grows and `send_failed_spans` does not. Time the same scripted turn with `TELEMETRY__ENABLED=true` and `false` (5 runs each) and report the latency difference (design.md, decision 9). Paste the readings and timings in the step summary.
+- [x] 5.3 Agent, in the dev container: before and after 5.2, read `curl -s edot-collector:8888/metrics | grep spans` and confirm `otelcol_exporter_sent_spans{exporter="otlphttp/langfuse"}` grows and `send_failed_spans` does not. Time the same scripted turn with `TELEMETRY__ENABLED=true` and `false` (5 runs each) and report the latency difference (design.md, decision 9). Paste the readings and timings in the step summary.
 
 ## Workflow follow-up
 
