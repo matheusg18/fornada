@@ -2,7 +2,7 @@
 
 ## 1. API continues the caller's trace
 
-- [ ] 1.1 Add an API test that posts a message with a fixed `traceparent` and asserts the SERVER span's trace id and parent span id, and that `invoke_agent` shares the trace id. Add a second test where no header gives a root SERVER span. Verify with `uv run task check` in `apps/api` (no production code change expected; design decision 1).
+- [x] 1.1 Add an API test that posts a message with a fixed `traceparent` and asserts the SERVER span's trace id and parent span id, and that `invoke_agent` shares the trace id. Add a second test where no header gives a root SERVER span. Verify with `uv run task check` in `apps/api` (no production code change expected; design decision 1).
 
 ## 2. Simulator tracing
 
