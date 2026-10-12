@@ -23,9 +23,9 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "which spans and attrib
 
 ## 3. Model span (`chat`)
 
-- [ ] 3.1 Give `call_model` the run `config` so it can read `thread_id` (design.md, decision 2), with no behavior change. Verify the existing `tests/unit/agents/test_nodes.py` and `test_graph.py` pass.
-- [ ] 3.2 Check which `response_metadata` keys `langchain-anthropic` 1.7.5 and `langchain-openai` 1.6.7 fill for response model, response id and finish/stop reason. Read the installed source and record the keys in the Learn by Doing note for 3.4. Verify by quoting the source lines in the step summary.
-- [ ] 3.3 Write failing unit tests:
+- [x] 3.1 Give `call_model` the run `config` so it can read `thread_id` (design.md, decision 2), with no behavior change. Verify the existing `tests/unit/agents/test_nodes.py` and `test_graph.py` pass.
+- [x] 3.2 Check which `response_metadata` keys `langchain-anthropic` 1.7.5 and `langchain-openai` 1.6.7 fill for response model, response id and finish/stop reason. Read the installed source and record the keys in the Learn by Doing note for 3.4. Verify by quoting the source lines in the step summary.
+- [x] 3.3 Write failing unit tests:
   - one `chat claude-haiku-4-5` span per model call, kind CLIENT, child of `invoke_agent`;
   - provider and request model read from the chat model's `_get_ls_params()` (`ScriptedChatModel` overrides it to return `anthropic`/`claude-haiku-4-5`), and `fornada.prompt.version`;
   - a test over the real `ChatAnthropic` and `ChatOpenAI` classes that `_get_ls_params()` gives `anthropic`/`claude-haiku-4-5` and `openai`/`gpt-5-mini`, so a LangChain change breaks a test;
@@ -36,7 +36,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "which spans and attrib
   - no attribute holding the customer's text.
 
   Extend `ScriptedChatModel` only if it needs to return usage or metadata. Verify they fail.
-- [ ] 3.4 TODO(human): create the `chat` span around `model_with_tools.ainvoke` in `call_model` and set the response attributes (design.md, decisions 6 and 8.2). Verify the 3.3 tests pass.
+- [x] 3.4 TODO(human): create the `chat` span around `model_with_tools.ainvoke` in `call_model` and set the response attributes (design.md, decisions 6 and 8.2). Verify the 3.3 tests pass.
 
 ## 4. Tool spans (`execute_tool`) and the full-day rule
 

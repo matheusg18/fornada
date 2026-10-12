@@ -5,14 +5,17 @@ import uuid
 from typing import Any
 
 import pytest
+from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.outputs import ChatResult
 from langchain_core.tools import tool
+from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 from opentelemetry import trace
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import NoOpTracer, SpanKind, StatusCode
+from pydantic import SecretStr
 
 from fornada_api.agents.attendant import tracing
 from fornada_api.agents.attendant.attendant import GraphAttendant
@@ -181,3 +184,138 @@ async def test_same_turn_with_and_without_tracing(
     assert turn_spans(spans) == []
     assert traced_replies == plain_replies == [["Temos bolo"], ["ok"]]
     assert comparable(traced_stored) == comparable(plain_stored)
+
+
+# --- chat spans --------------------------------------------------------------
+
+CHAT_SPAN = "chat claude-haiku-4-5"
+
+
+def chat_spans(exporter: InMemorySpanExporter) -> list[ReadableSpan]:
+    return [s for s in exporter.get_finished_spans() if s.name == CHAT_SPAN]
+
+
+def answer(text: str, **fields: Any) -> AIMessage:
+    """A model answer as `ChatAnthropic` returns it, with usage and metadata."""
+    return AIMessage(text, **fields)
+
+
+async def test_one_chat_span_per_model_call(spans: InMemorySpanExporter) -> None:
+    model = ScriptedChatModel(answers=[tool_call("search_catalog", {}, "c1"), AIMessage("ok")])
+    agent, _ = build(model)
+    await agent.reply(uuid.uuid4(), "catálogo")
+
+    (turn,) = turn_spans(spans)
+    chats = chat_spans(spans)
+    assert turn.context is not None
+    assert len(chats) == 2
+    for chat in chats:
+        assert chat.kind is SpanKind.CLIENT
+        assert chat.parent is not None
+        assert chat.parent.span_id == turn.context.span_id
+
+
+async def test_chat_span_names_the_provider_and_model(spans: InMemorySpanExporter) -> None:
+    agent, _ = build(ScriptedChatModel(answers=[AIMessage("Olá!")]))
+    await agent.reply(uuid.uuid4(), "oi")
+
+    (chat,) = chat_spans(spans)
+    assert attrs(chat)[tracing.GEN_AI_OPERATION_NAME] == "chat"
+    assert attrs(chat)[tracing.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert attrs(chat)[tracing.GEN_AI_REQUEST_MODEL] == "claude-haiku-4-5"
+
+
+async def test_chat_span_carries_prompt_version_and_session(spans: InMemorySpanExporter) -> None:
+    agent, _ = build(ScriptedChatModel(answers=[AIMessage("Olá!")]))
+    conversation = uuid.uuid4()
+    await agent.reply(conversation, "oi")
+
+    (chat,) = chat_spans(spans)
+    assert attrs(chat)[tracing.FORNADA_PROMPT_VERSION] == PROMPT.version
+    assert attrs(chat)[tracing.GEN_AI_CONVERSATION_ID] == str(conversation)
+    assert attrs(chat)[tracing.SESSION_ID] == str(conversation)
+
+
+async def test_chat_span_carries_usage_and_response(spans: InMemorySpanExporter) -> None:
+    reply = answer(
+        "Olá!",
+        usage_metadata={"input_tokens": 1200, "output_tokens": 85, "total_tokens": 1285},
+        # Keys `langchain-anthropic` 1.7.5 puts in `response_metadata`.
+        response_metadata={
+            "id": "msg_01",
+            "model_name": "claude-haiku-4-5-20251001",
+            "stop_reason": "end_turn",
+        },
+    )
+    agent, _ = build(ScriptedChatModel(answers=[reply]))
+    await agent.reply(uuid.uuid4(), "oi")
+
+    (chat,) = chat_spans(spans)
+    assert attrs(chat)[tracing.GEN_AI_USAGE_INPUT_TOKENS] == 1200
+    assert attrs(chat)[tracing.GEN_AI_USAGE_OUTPUT_TOKENS] == 85
+    assert attrs(chat)[tracing.GEN_AI_RESPONSE_MODEL] == "claude-haiku-4-5-20251001"
+    assert attrs(chat)[tracing.GEN_AI_RESPONSE_ID] == "msg_01"
+    assert attrs(chat)[tracing.GEN_AI_RESPONSE_FINISH_REASONS] == ("end_turn",)
+
+
+async def test_chat_span_reads_the_openai_finish_reason(spans: InMemorySpanExporter) -> None:
+    # `langchain-openai` 1.6.7 names it `finish_reason`, not `stop_reason`.
+    reply = answer("Olá!", response_metadata={"id": "chatcmpl-1", "finish_reason": "stop"})
+    agent, _ = build(ScriptedChatModel(answers=[reply]))
+    await agent.reply(uuid.uuid4(), "oi")
+
+    (chat,) = chat_spans(spans)
+    assert attrs(chat)[tracing.GEN_AI_RESPONSE_FINISH_REASONS] == ("stop",)
+
+
+async def test_chat_span_without_usage_has_no_token_attributes(
+    spans: InMemorySpanExporter,
+) -> None:
+    agent, _ = build(ScriptedChatModel(answers=[AIMessage("Olá!")]))
+    await agent.reply(uuid.uuid4(), "oi")
+
+    (chat,) = chat_spans(spans)
+    assert not [k for k in attrs(chat) if k.startswith("gen_ai.usage.")]
+    assert tracing.GEN_AI_RESPONSE_FINISH_REASONS not in attrs(chat)
+
+
+async def test_failed_model_call_marks_the_chat_span_as_error(
+    spans: InMemorySpanExporter,
+) -> None:
+    agent, _ = build(FailingChatModel(answers=[AIMessage("nunca")]))
+    with pytest.raises(ProviderDown):
+        await agent.reply(uuid.uuid4(), "oi")
+
+    (chat,) = chat_spans(spans)
+    assert chat.status.status_code is StatusCode.ERROR
+    assert attrs(chat)[tracing.ERROR_TYPE] == "ProviderDown"
+    assert [e.name for e in chat.events] == ["exception"]
+    # The status carries no exception message: messages can hold customer data.
+    assert not chat.status.description
+
+
+async def test_chat_span_carries_no_conversation_text(spans: InMemorySpanExporter) -> None:
+    secret = "Meu telefone é 11 98765-4321"
+    agent, _ = build(ScriptedChatModel(answers=[AIMessage("Anotado, 11 98765-4321")]))
+    await agent.reply(uuid.uuid4(), secret)
+
+    (chat,) = chat_spans(spans)
+    values = " ".join(str(v) for v in attrs(chat).values())
+    assert "98765-4321" not in values
+    assert PROMPT.text not in values
+
+
+def test_langchain_models_report_provider_and_model() -> None:
+    """The real chat classes give the values `chat` spans read, so a LangChain
+    change to `_get_ls_params()` breaks here, not silently in Langfuse."""
+    anthropic = ChatAnthropic(
+        model_name="claude-haiku-4-5", api_key=SecretStr("sk-ant-test"), timeout=None, stop=None
+    )
+    openai = ChatOpenAI(model="gpt-5-mini", api_key=SecretStr("sk-test"))
+
+    for model, provider, name in [
+        (anthropic, "anthropic", "claude-haiku-4-5"),
+        (openai, "openai", "gpt-5-mini"),
+    ]:
+        params = model._get_ls_params()
+        assert (params.get("ls_provider"), params.get("ls_model_name")) == (provider, name)

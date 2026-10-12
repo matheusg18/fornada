@@ -1,5 +1,6 @@
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 
 from fornada_api.agents.attendant.nodes import make_call_model
@@ -19,7 +20,8 @@ def search_catalog() -> str:
 
 async def run_node(model: ScriptedChatModel):
     node = make_call_model(model, [search_catalog], PROMPT)
-    return await node({"messages": [HumanMessage("oi")], "prompt_version": ""})
+    config: RunnableConfig = {"configurable": {"thread_id": "t1"}}
+    return await node({"messages": [HumanMessage("oi")], "prompt_version": ""}, config)
 
 
 async def test_model_sees_the_system_prompt_first() -> None:
