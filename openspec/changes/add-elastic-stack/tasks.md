@@ -22,15 +22,39 @@ All of this is periphery (AGENTS.md, phase 2: "Elastic and Langfuse compose, cre
 
 ## 3. Behavior checks (`elastic-stack` scenarios)
 
-- [ ] 3.1 Maintainer opens http://localhost:5601 on the host, logs in as `elastic` and reaches the Kibana home page. This is the first half of the "Pronto quando".
+- [x] 3.1 Maintainer opens http://localhost:5601 on the host, logs in as `elastic` and reaches the Kibana home page. This is the first half of the "Pronto quando".
 - [x] 3.2 Limits: maintainer runs `docker inspect -f '{{.HostConfig.Memory}} {{.HostConfig.MemorySwap}}'` for `elasticsearch` and `kibana` (expect `1610612736 1610612736` and `1073741824 1073741824`) and, in Kibana Dev Tools, `GET _nodes/stats/jvm?filter_path=**.heap_max_in_bytes` (expect 536870912). Record the outputs.
 - [x] 3.3 Persistence: in Kibana Dev Tools, index one test document; maintainer restarts the dev environment; the document is still returned by a search and Kibana logs in again without any manual step. Delete the test index afterwards.
 - [x] 3.4 Secret hygiene: `git grep` finds none of the three secret values (maintainer provides them or runs the grep on the host), and `env | grep -i -E 'elastic|kibana'` in `dev` prints nothing. Record the result.
 
 ## 4. Memory with everything up (`elastic-stack`: fixed memory budget, machine stays usable)
 
-- [ ] 4.1 With every service up and idle for a few minutes and Kibana open in the browser (including one visit to Observability, the heaviest app it will open in step B), maintainer runs `docker stats --no-stream` on the host; agent runs `free -h` in `dev`. Write a before/after table (per service, total, available host memory) against the 0.1 baseline in the step summary. Pass: Elasticsearch under 1.5 GiB and Kibana under 1 GiB, `RestartCount` 0 and no `Killed process` in `journalctl -k`, and the maintainer confirms the editor and browser stay responsive. That is the second half of the "Pronto quando".
-- [ ] 4.2 If Kibana is OOM-killed or Elasticsearch fails at 4.1, apply the fallback in design.md (Risks) in this change, update the numbers in the spec, design and AGENTS.md together, and repeat 4.1. If available memory is too low, record which existing service uses the most and propose the follow-up change; do not limit it here.
+- [x] 4.1 With every service up and idle for a few minutes and Kibana open in the browser (including one visit to Observability, the heaviest app it will open in step B), maintainer runs `docker stats --no-stream` on the host; agent runs `free -h` in `dev`. Write a before/after table (per service, total, available host memory) against the 0.1 baseline in the step summary. Pass: Elasticsearch under 1.5 GiB and Kibana under 1 GiB, `RestartCount` 0 and no `Killed process` in `journalctl -k`, and the maintainer confirms the editor and browser stay responsive. That is the second half of the "Pronto quando".
+- [x] 4.2 If Kibana is OOM-killed or Elasticsearch fails at 4.1, apply the fallback in design.md (Risks) in this change, update the numbers in the spec, design and AGENTS.md together, and repeat 4.1. If available memory is too low, record which existing service uses the most and propose the follow-up change; do not limit it here. Not triggered: no OOM kill and 5.5 GiB available at 4.1.
+
+## Results
+
+Measured on the maintainer's host (15 GiB RAM, 8 GiB swap, 12 CPUs) on 2026-10-13. Baseline (0.1): the stack before this change, idle for 3 minutes, editor not attached. After (4.1): every service idle for 3 minutes, VS Code attached to `dev`, Kibana open after a visit to Observability.
+
+| Service | Baseline | After | Limit |
+|---|---|---|---|
+| elasticsearch | — | 1156 MiB | 1.5 GiB |
+| kibana | — | 835 MiB | 1 GiB |
+| langfuse-web | 878 MiB | 631 MiB* | — |
+| langfuse-worker | 725 MiB | 498 MiB* | — |
+| clickhouse | 301 MiB | 242 MiB* | — |
+| edot-collector | 98 MiB | 66 MiB | — |
+| minio, postgres, valkey | 104 MiB | 91 MiB | — |
+| dev | 0.5 MiB | 2.29 GiB (VS Code server, Pylance, Claude Code) | — |
+| **Containers** | **~2.1 GiB** | **~5.7 GiB** | |
+| **Host available** | 9.9 GiB | 5.5 GiB | |
+| **Swap used** | 0 | 2.0 GiB | |
+
+\* Lower because idle pages moved to swap.
+
+- Elasticsearch at the planned 1 GiB was OOM-killed about 2.5 minutes after start; raised to 1.5 GiB (design.md, decision 2).
+- At 4.1: `RestartCount` 0 for both Elastic services, no `Killed process` in `journalctl -k`, Kibana's cgroup `max` events unchanged since boot. The maintainer confirmed the editor and browser stayed responsive.
+- No limits on existing services for now. The largest unbounded consumers are `dev` (the editor) and Langfuse.
 
 ## Workflow follow-up
 
