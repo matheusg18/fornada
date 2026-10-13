@@ -4,12 +4,12 @@ All of this is periphery (AGENTS.md, phase 2: "Elastic and Langfuse compose, cre
 
 ## 0. Baseline
 
-- [ ] 0.1 Before any change, with the current stack up, record available memory from `dev` (`free -h`) and ask the maintainer for `docker stats --no-stream` from the host. Paste both in the step summary; task 4 compares against them.
+- [x] 0.1 Before any change, with the current stack up, record available memory from `dev` (`free -h`) and ask the maintainer for `docker stats --no-stream` from the host. Paste both in the step summary; task 4 compares against them.
 
 ## 1. Secrets (`elastic-stack`: secrets stay out of the repo and the workspace)
 
-- [ ] 1.1 Update `.devcontainer/init-env.sh` (design.md, decision 6): the new-file branch writes `ELASTIC_PASSWORD`, `KIBANA_SYSTEM_PASSWORD` and `KIBANA_ENCRYPTION_KEY`; an `ensure_secret` helper appends each one to an existing file that lacks it, with no other line changed. Verify against copies in the scratchpad (no file, a file from before `LANGFUSE_OTLP_AUTH`, a current file, a file already updated): `diff` shows only appended lines, a second run changes nothing, and `KIBANA_ENCRYPTION_KEY` is at least 32 characters.
-- [ ] 1.2 Add the three variables with one comment each to `.devcontainer/.env.example`. Verify every variable `init-env.sh` writes appears in the template.
+- [x] 1.1 Update `.devcontainer/init-env.sh` (design.md, decision 6): the new-file branch writes `ELASTIC_PASSWORD`, `KIBANA_SYSTEM_PASSWORD` and `KIBANA_ENCRYPTION_KEY`; an `ensure_secret` helper appends each one to an existing file that lacks it, with no other line changed. Verify against copies in the scratchpad (no file, a file from before `LANGFUSE_OTLP_AUTH`, a current file, a file already updated): `diff` shows only appended lines, a second run changes nothing, and `KIBANA_ENCRYPTION_KEY` is at least 32 characters.
+- [x] 1.2 Add the three variables with one comment each to `.devcontainer/.env.example`. Verify every variable `init-env.sh` writes appears in the template.
 
 ## 2. Services (`elastic-stack`: run with the dev environment, reachability, authentication, `kibana_system`, persistence, memory budget)
 
