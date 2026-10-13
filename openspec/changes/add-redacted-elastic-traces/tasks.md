@@ -28,9 +28,9 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "the pipelines in the C
 
 ## 4. Elasticsearch user and secrets
 
-- [ ] 4.1 Add `ELASTIC_OTEL_PASSWORD` (`hex 24`) and `PHONE_HASH_SALT` (`hex 32`) to `.devcontainer/init-env.sh`, both in the new-file branch and through `ensure_secret`, and to `.devcontainer/.env.example` with one comment each (design.md, decision 7). Verify by running the script logic against a copy of an old `.env` in the scratchpad: the two lines are appended and every other line is unchanged.
-- [ ] 4.2 Extend `elasticsearch-setup` in `.devcontainer/compose.yaml`: idempotent `PUT` of role `otel_writer` (index privileges `auto_configure` and `create_doc` on `traces-*`, `metrics-*` and `logs-*`; cluster `monitor`, checked against the EDOT `elasticsearch` exporter docs) and of user `otel_collector`, before the `kibana_system` call. Pass `ELASTIC_OTEL_PASSWORD` to it. Verify with `docker compose config` on the host (maintainer) or by reviewing the rendered YAML, and that `git grep` finds no secret values.
-- [ ] 4.3 Give `edot-collector` the environment variables `ELASTIC_OTEL_PASSWORD` and `PHONE_HASH_SALT`, and `depends_on: elasticsearch-setup: service_completed_successfully`. Verify that `env` in `dev` shows neither variable.
+- [x] 4.1 Add `ELASTIC_OTEL_PASSWORD` (`hex 24`) and `PHONE_HASH_SALT` (`hex 32`) to `.devcontainer/init-env.sh`, both in the new-file branch and through `ensure_secret`, and to `.devcontainer/.env.example` with one comment each (design.md, decision 7). Verify by running the script logic against a copy of an old `.env` in the scratchpad: the two lines are appended and every other line is unchanged.
+- [x] 4.2 Extend `elasticsearch-setup` in `.devcontainer/compose.yaml`: idempotent `PUT` of role `otel_writer` (index privileges `auto_configure` and `create_doc` on `traces-*-*`, `metrics-*-*` and `logs-*-*`; no cluster privilege, per the EDOT `elasticsearch` exporter docs) and of user `otel_collector`, before the `kibana_system` call. Pass `ELASTIC_OTEL_PASSWORD` to it. Verify with `docker compose config` on the host (maintainer) or by reviewing the rendered YAML, and that `git grep` finds no secret values.
+- [x] 4.3 Give `edot-collector` the environment variables `ELASTIC_OTEL_PASSWORD` and `PHONE_HASH_SALT`, and `depends_on: elasticsearch-setup: service_completed_successfully`. Verify that `env` in `dev` shows neither variable.
 
 ## 5. Collector fan-out and redaction
 

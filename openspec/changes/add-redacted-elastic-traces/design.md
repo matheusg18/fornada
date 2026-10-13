@@ -100,7 +100,7 @@ This keeps `langfuse.*` attributes out of app code, as `add-agent-spans` decided
 ### 7. Elasticsearch user for the Collector
 
 `elasticsearch-setup` gains two idempotent calls, a `PUT` for the role and a `PUT` for the user, run before the existing `kibana_system` call:
-- Role `otel_writer`: index privileges `auto_configure` and `create_doc` on `traces-*`, `metrics-*` and `logs-*` (logs is included so the next change needs no new role), and cluster privilege `monitor`. The exact list is checked against the exporter's docs during implementation.
+- Role `otel_writer`: index privileges `auto_configure` and `create_doc` on `traces-*-*`, `metrics-*-*` and `logs-*-*`, the exporter's default data streams (logs is included so the next change needs no new role). No cluster privilege. *Checked in task 4.2:* the EDOT `elasticsearch` exporter docs list these index privileges and no cluster privilege for `otel` mode; `monitor` is only for node discovery, which this setup does not use.
 - User `otel_collector` with role `otel_writer`. Its password is `ELASTIC_OTEL_PASSWORD`.
 
 The exporter authenticates with that user and password. `edot-collector` gets `depends_on: elasticsearch-setup: service_completed_successfully`, so the user exists before the first export.
