@@ -16,6 +16,17 @@ env_value() { sed -n "s/^$1=//p" "$env_file" | tail -n 1; }
 # base64("public_key:secret_key"), on one line (GNU base64 wraps at 76 chars).
 langfuse_otlp_auth() { printf '%s:%s' "$1" "$2" | base64 | tr -d '\n'; }
 
+# Append KEY=VALUE to the env file, keeping its last line intact if the file
+# does not end with a newline.
+append_env() {
+  [[ -n "$(tail -c 1 "$env_file")" ]] && echo >> "$env_file"
+  echo "$1=$2" >> "$env_file"
+  echo "Added $1 to .devcontainer/.env."
+}
+
+# Append KEY=VALUE only if KEY has no value yet; never rewrite an existing one.
+ensure_secret() { [[ -n "$(env_value "$1")" ]] || append_env "$1" "$2"; }
+
 if [[ ! -f "$env_file" ]]; then
   langfuse_public_key="pk-lf-$(hex 16)"
   langfuse_secret_key="sk-lf-$(hex 16)"
@@ -34,6 +45,9 @@ LANGFUSE_ADMIN_PASSWORD=$(hex 12)
 CLICKHOUSE_PASSWORD=$(hex 24)
 VALKEY_PASSWORD=$(hex 24)
 MINIO_ROOT_PASSWORD=$(hex 24)
+ELASTIC_PASSWORD=$(hex 24)
+KIBANA_SYSTEM_PASSWORD=$(hex 24)
+KIBANA_ENCRYPTION_KEY=$(hex 32)
 EOF
   chmod 600 "$env_file"
   echo "Created .devcontainer/.env with random secrets."
@@ -49,8 +63,10 @@ if [[ -z "$(env_value LANGFUSE_OTLP_AUTH)" ]]; then
     echo "init-env: LANGFUSE_PUBLIC_KEY or LANGFUSE_SECRET_KEY missing in $env_file" >&2
     exit 1
   fi
-  # Keep the last line intact if the file does not end with a newline.
-  [[ -n "$(tail -c 1 "$env_file")" ]] && echo >> "$env_file"
-  echo "LANGFUSE_OTLP_AUTH=$(langfuse_otlp_auth "$langfuse_public_key" "$langfuse_secret_key")" >> "$env_file"
-  echo "Added LANGFUSE_OTLP_AUTH to .devcontainer/.env."
+  append_env LANGFUSE_OTLP_AUTH "$(langfuse_otlp_auth "$langfuse_public_key" "$langfuse_secret_key")"
 fi
+
+# Random secrets introduced after the file was created.
+ensure_secret ELASTIC_PASSWORD "$(hex 24)"
+ensure_secret KIBANA_SYSTEM_PASSWORD "$(hex 24)"
+ensure_secret KIBANA_ENCRYPTION_KEY "$(hex 32)"
