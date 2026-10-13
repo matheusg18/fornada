@@ -8,7 +8,7 @@
 - `init-env.sh` runs on the host before every start. It creates `.devcontainer/.env` once; afterwards it only derives `LANGFUSE_OTLP_AUTH` when it is missing. It has no general "add a new random secret" path yet.
 - The `dev` container has no Docker socket, so `docker stats`, `docker compose exec` and restarts are run by the maintainer on the host.
 - AGENTS.md puts "Elastic and Langfuse compose, credentials" in the periphery for phase 2, so this change has no `TODO(human)` markers.
-- Memory choices (1 GiB each, auth on without TLS) were made by the maintainer when the change was proposed.
+- Memory choices (1 GiB each, auth on without TLS) were made by the maintainer when the change was proposed. Elasticsearch was raised to 1.5 GiB during implementation, also by the maintainer, after it was OOM-killed at 1 GiB (decision 2).
 
 ## Goals / Non-Goals
 
@@ -36,13 +36,15 @@ Elasticsearch settings, as environment variables on the service:
 
 | Service | `mem_limit` | `memswap_limit` | Runtime cap |
 |---|---|---|---|
-| `elasticsearch` | 1g | 1g | `ES_JAVA_OPTS=-Xms512m -Xmx512m` |
+| `elasticsearch` | 1536m | 1536m | `ES_JAVA_OPTS=-Xms512m -Xmx512m` |
 | `kibana` | 1g | 1g | `NODE_OPTIONS=--max-old-space-size=768` |
 
-- Heap at half the container limit is Elastic's own guidance: the other half is for off-heap buffers, Lucene's file cache and the JVM itself. Elasticsearch would pick about this on its own from the cgroup limit, but writing it down makes the spec checkable and stops a future limit change from silently changing the heap.
+- Heap at 512 MiB, a third of the container limit. Elastic's guidance is at most half; the rest is for off-heap memory, Lucene's file cache and the JVM itself. Writing the heap down makes the spec checkable and stops a future limit change from silently changing it.
+- *Planned: 1 GiB for Elasticsearch, heap at half.* Measured on 9.5.5 with an empty cluster on the 12-CPU host: 512 MiB heap (pre-touched) + ~290 MiB non-heap (metaspace, code cache) + stacks for 189 threads and malloc arenas reached 1023 MiB of anonymous memory, and the kernel OOM-killed it about 2.5 minutes after start. With `node.processors=2` (85 threads) it still climbed from 929 to 961 MiB in 4 minutes and hit the cgroup limit, leaving no room for step B indexing. Raised to 1.5 GiB, heap unchanged, by the maintainer's choice.
+- *Alternative: stay at 1 GiB with a 384 MiB heap and `node.processors=2`.* Rejected: the heap gets tight once step B indexes traces, logs and metrics, and the non-heap part keeps growing.
 - `memswap_limit` equal to `mem_limit` disables swap for the container. Without it, Docker allows as much swap as RAM, and a swapping JVM gets slow without failing, which is the "machine becomes unusable" failure this change is about. With no swap, an overrun is an OOM kill of that container only, visible in `docker compose ps` and restarted by the policy.
 - Kibana's Node heap is capped below the container limit so V8 collects garbage before the kernel kills the process.
-- `xpack.ml.enabled=false`: machine learning starts a native process with its own off-heap memory, which does not fit in 1 GiB and is not used by any phase.
+- `xpack.ml.enabled=false`: machine learning starts a native process with its own off-heap memory, which does not fit the limit and is not used by any phase.
 - *Alternative: `deploy.resources.limits.memory`.* Same effect in Compose v2, but `mem_limit`/`memswap_limit` sit next to each other at service level and the swap limit has no `deploy` equivalent.
 - *Alternative: limit every service now.* Deferred: the proposal keeps this change to the new services. Task 4 measures the rest so a follow-up can be argued from numbers.
 
@@ -58,7 +60,7 @@ Elasticsearch settings, as environment variables on the service:
 ### 4. Health checks and reachability
 
 - `elasticsearch`: `curl -s -u elastic:$ELASTIC_PASSWORD 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s'` succeeds. A single node with replicas stays yellow forever, so yellow counts as healthy.
-- `kibana`: `/api/status` reports `available`. `STATUS_ALLOWANONYMOUS=true` lets the check (and the agent, from `dev` at `kibana:5601`) read the overall level without credentials; it shows no details. Port published as `127.0.0.1:5601:5601`, added to `forwardPorts` in `devcontainer.json` with the label "Kibana".
+- `kibana`: `/api/status` reports `available`. With `status.allowAnonymous` left at its default (`false`), an unauthenticated caller gets a redacted response with only the overall level, which is enough for the check and for the agent from `dev` at `kibana:5601`. Setting it to `true` returns the full status (versions, build, host memory, every plugin) without login, so it stays off. (Planned as `true`; Kibana 9.5's status route returns the full response whenever anonymous access is allowed.) Port published as `127.0.0.1:5601:5601`, added to `forwardPorts` in `devcontainer.json` with the label "Kibana".
 - Elasticsearch publishes no host port, like the Collector. The maintainer uses Kibana's Dev Tools; the `dev` container reaches `elasticsearch:9200` but has no credentials, which is enough to check it answers 401.
 - `dev` keeps depending on `postgres` only, so the editor does not wait for Kibana's slow first start (1–2 minutes).
 
@@ -81,12 +83,12 @@ New variables: `ELASTIC_PASSWORD` (`hex 24`), `KIBANA_SYSTEM_PASSWORD` (`hex 24`
 
 ## Risks / Trade-offs
 
-- [Kibana 9 needs more than 1 GiB at startup or when APM opens, and gets OOM-killed in a loop] → `docker compose ps` shows restarts and `docker inspect` shows `OOMKilled`. Raise Kibana to 1.5 GiB (and its Node heap to 1 GiB) in this change and record why; the spec's number is updated with it.
+- [Kibana 9 needs more than 1 GiB at startup or when APM opens, and gets OOM-killed in a loop] → `docker inspect` shows a growing `RestartCount` and `journalctl -k` on the host shows `Memory cgroup out of memory: Killed process`; `.State.OOMKilled` only describes the current run and is false again after the restart. Raise Kibana to 1.5 GiB (and its Node heap to 1 GiB) in this change and record why; the spec's number is updated with it.
 - [512 MiB heap is too small once step B indexes traces, logs and metrics] → circuit-breaker errors in the Collector's export counters and in Kibana. Revisit the limit then, with the measured index size; not a problem with an empty cluster.
 - [Low `vm.max_map_count` on the host] → not enforced in single-node mode; at worst a startup warning. If Elasticsearch fails on mmap, set `node.store.allow_mmap=false`.
 - [Disk watermarks: at 90% disk use Elasticsearch makes indices read-only] → the host is at 22% today; left at defaults so a full disk is visible rather than hidden.
-- [About 2 GiB more RAM with everything up] → that is the point of the limits: the cost is bounded and measured in task 4. If available memory drops too low, the follow-up limits the existing services (ClickHouse is the likely first one).
-- [`STATUS_ALLOWANONYMOUS` exposes Kibana's overall status without login] → loopback only, overall level only.
+- [Up to 2.5 GiB more RAM with everything up] → that is the point of the limits: the cost is bounded and measured in task 4. If available memory drops too low, the follow-up limits the existing services (ClickHouse is the likely first one).
+- [Anonymous callers see Kibana's overall status level] → loopback only, overall level only; `status.allowAnonymous` stays off so details need a login.
 - [The `elastic` password is a superuser credential] → it lives only in the gitignored `.devcontainer/.env` and the two services that need it.
 
 ## Migration Plan

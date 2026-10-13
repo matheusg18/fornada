@@ -80,11 +80,11 @@ Elasticsearch SHALL keep its data in a named volume, so indices and the security
 - **THEN** the document is still searchable
 
 ### Requirement: Elastic services have a fixed memory budget
-Elasticsearch and Kibana SHALL each be limited to 1 GiB of RAM with no swap. Elasticsearch's JVM heap SHALL be fixed at 512 MiB. When a limit is hit, only that service SHALL be affected.
+Elasticsearch SHALL be limited to 1.5 GiB of RAM and Kibana to 1 GiB, both with no swap. Elasticsearch's JVM heap SHALL be fixed at 512 MiB. When a limit is hit, only that service SHALL be affected.
 
 #### Scenario: Limits applied
 - **WHEN** the dev environment is running
-- **THEN** the container runtime reports a 1 GiB memory limit for Elasticsearch and for Kibana, and Elasticsearch reports a 512 MiB maximum heap
+- **THEN** the container runtime reports a 1.5 GiB memory limit for Elasticsearch and a 1 GiB limit for Kibana, and Elasticsearch reports a 512 MiB maximum heap
 
 #### Scenario: Machine stays usable with everything up
 - **WHEN** every dev service is running and idle after startup, with Kibana open in the browser
