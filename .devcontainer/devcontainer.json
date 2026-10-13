@@ -25,9 +25,10 @@
     "CLAUDE_CONFIG_DIR": "/home/vscode/.claude"
   },
 
-  "forwardPorts": [3000],
+  "forwardPorts": [3000, 5601],
   "portsAttributes": {
-    "3000": { "label": "Langfuse", "onAutoForward": "notify" }
+    "3000": { "label": "Langfuse", "onAutoForward": "notify" },
+    "5601": { "label": "Kibana", "onAutoForward": "notify" }
   },
 
   "customizations": {

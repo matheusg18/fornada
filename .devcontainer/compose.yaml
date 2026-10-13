@@ -1,6 +1,8 @@
 # Dev environment: the `dev` container plus local infrastructure, PostgreSQL
-# (app + Langfuse databases), a self-hosted Langfuse v4 stack and the EDOT
-# Collector (plus `telemetrygen`, an on-demand smoke test for it).
+# (app + Langfuse databases), a self-hosted Langfuse v4 stack, the EDOT
+# Collector (plus `telemetrygen`, an on-demand smoke test for it), and
+# Elasticsearch and Kibana (plus `elasticsearch-setup`, a one-shot that sets
+# Kibana's service user password).
 #
 # Secrets for this environment live in `.devcontainer/.env`, which Compose loads
 # automatically from this folder (template: `.devcontainer/.env.example`; the
@@ -12,7 +14,12 @@
 # https://github.com/langfuse/langfuse/blob/main/docker-compose.yml
 #
 # Image versions are pinned exactly; Dependabot (.github/dependabot.yml) opens
-# PRs to bump them. Keep langfuse-web and langfuse-worker on the same version.
+# PRs to bump them. Keep langfuse-web and langfuse-worker on the same version,
+# and elasticsearch, elasticsearch-setup, kibana and edot-collector on the same
+# Elastic version.
+#
+# Only elasticsearch (1.5 GiB) and kibana (1 GiB) have memory limits, with no
+# swap.
 
 x-langfuse-env: &langfuse-env
   NEXTAUTH_URL: http://localhost:3000
@@ -199,6 +206,105 @@ services:
     volumes:
       - ./otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
 
+  elasticsearch:
+    # Single node, security on (login required) over plain HTTP: traffic never
+    # leaves the compose network. Reachable from `dev` as elasticsearch:9200
+    # (answers 401 without credentials). No port is published to the host; use
+    # Kibana's Dev Tools. Setting security explicitly turns off the image's
+    # auto-configuration (generated certificates, enrollment tokens).
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.5
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "true"
+      xpack.security.http.ssl.enabled: "false"
+      xpack.security.transport.ssl.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+      xpack.license.self_generated.type: basic
+      # Machine learning runs a native process with its own off-heap memory
+      # that does not fit the limit below, and no phase uses it.
+      xpack.ml.enabled: "false"
+      # Fixed heap, so a limit change does not silently change it.
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:?}
+    # 1.5 GiB of RAM and no swap (memswap_limit equal to mem_limit). Outside
+    # the 512 MiB heap, 9.5 uses ~300 MiB of metaspace and code cache plus
+    # thread stacks and malloc arenas (thread pools scale with host CPUs):
+    # measured at 1 GiB, it was OOM-killed within minutes. A swapping JVM gets
+    # slow instead of failing and drags the whole machine with it; an overrun
+    # is an OOM kill of this container only, restarted by the policy.
+    mem_limit: 1536m
+    memswap_limit: 1536m
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      # A single node keeps replica shards unassigned, so yellow is healthy.
+      test: ["CMD-SHELL", "curl -fs -u \"elastic:$$ELASTIC_PASSWORD\" 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s' >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  elasticsearch-setup:
+    # One-shot: sets the built-in `kibana_system` password, then exits 0. The
+    # call is idempotent, so it runs on every start and also repairs a volume
+    # whose password came from an older secret. Uses the Elasticsearch image
+    # for its curl.
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.5
+    restart: "no"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:?}
+      KIBANA_SYSTEM_PASSWORD: ${KIBANA_SYSTEM_PASSWORD:?}
+    command:
+      - bash
+      - -c
+      - >-
+        curl -fsS -u "elastic:$$ELASTIC_PASSWORD"
+        -H 'Content-Type: application/json'
+        -d "{\"password\":\"$$KIBANA_SYSTEM_PASSWORD\"}"
+        http://elasticsearch:9200/_security/user/kibana_system/_password
+        && echo ' kibana_system password set'
+
+  kibana:
+    # Connects as `kibana_system` (Kibana refuses the `elastic` superuser).
+    # Log in at http://localhost:5601 as `elastic`. The first start takes 1-2
+    # minutes; `dev` does not wait for it.
+    image: docker.elastic.co/kibana/kibana:9.5.5
+    restart: unless-stopped
+    depends_on:
+      elasticsearch-setup:
+        condition: service_completed_successfully
+    ports:
+      - 127.0.0.1:5601:5601
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      ELASTICSEARCH_USERNAME: kibana_system
+      ELASTICSEARCH_PASSWORD: ${KIBANA_SYSTEM_PASSWORD:?}
+      # One stable key for all three; APM and alerting keep encrypted saved
+      # objects that break on restart without it.
+      XPACK_SECURITY_ENCRYPTIONKEY: ${KIBANA_ENCRYPTION_KEY:?}
+      XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY: ${KIBANA_ENCRYPTION_KEY:?}
+      XPACK_REPORTING_ENCRYPTIONKEY: ${KIBANA_ENCRYPTION_KEY:?}
+      TELEMETRY_OPTIN: "false"
+      # status.allowAnonymous stays off: anonymous /api/status callers (the
+      # health check, `dev` at kibana:5601) get only the overall level. Turning
+      # it on returns the full status (versions, host memory) without login.
+      # Node heap below the container limit, so V8 collects garbage before
+      # the kernel kills the process.
+      NODE_OPTIONS: --max-old-space-size=768
+    # 1 GiB of RAM and no swap, same reasoning as elasticsearch.
+    mem_limit: 1g
+    memswap_limit: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:5601/api/status | grep -q '\"level\":\"available\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
   telemetrygen:
     # Smoke test for the Collector: sends 5 synthetic traces (2 spans each) and
     # exits. Behind a profile, so it never starts with the dev environment. Run
@@ -215,6 +321,7 @@ volumes:
   clickhouse_logs:
   valkey_data:
   minio_data:
+  elasticsearch_data:
   venv:
   uv_cache:
   claude_config:
