@@ -37,6 +37,15 @@ GEN_AI_TOOL_CALL_ID = "gen_ai.tool.call.id"
 GEN_AI_TOOL_TYPE = "gen_ai.tool.type"
 TOOL_TYPE_FUNCTION = "function"
 
+# GenAI semconv content attributes, JSON strings. Only with content capture on
+# (`TELEMETRY__CAPTURE_CONTENT`); the Collector deletes them before
+# Elasticsearch. Built by `span_content`.
+GEN_AI_INPUT_MESSAGES = "gen_ai.input.messages"
+GEN_AI_OUTPUT_MESSAGES = "gen_ai.output.messages"
+GEN_AI_SYSTEM_INSTRUCTIONS = "gen_ai.system_instructions"
+GEN_AI_TOOL_CALL_ARGUMENTS = "gen_ai.tool.call.arguments"
+GEN_AI_TOOL_CALL_RESULT = "gen_ai.tool.call.result"
+
 # General semconv. Langfuse maps `session.id` to the trace's session;
 # it does not read `gen_ai.conversation.id`.
 SESSION_ID = "session.id"
@@ -45,3 +54,6 @@ ERROR_TYPE = "error.type"
 # Fornada's own attributes.
 FORNADA_PROMPT_VERSION = "fornada.prompt.version"
 FORNADA_CAPACITY_FREE_KG = "fornada.capacity.free_kg"
+# E.164 phone a tool was called with. Content too: only with capture on, and
+# the Collector replaces it with a salted hash before Elasticsearch.
+FORNADA_CUSTOMER_PHONE = "fornada.customer.phone"
