@@ -1,6 +1,7 @@
 """The attendant's spans (`agent-tracing` spec), read back from the session's
 in-memory exporter. The scripted model never touches the network."""
 
+import json
 import uuid
 from typing import Any
 
@@ -18,7 +19,7 @@ from opentelemetry.trace import NoOpTracer, SpanKind, StatusCode
 from pydantic import SecretStr
 
 from fornada_api.agents.attendant import tracing
-from fornada_api.agents.attendant.attendant import GraphAttendant
+from fornada_api.agents.attendant.attendant import FALLBACK_REPLY, GraphAttendant
 from fornada_api.agents.attendant.graph import build_graph
 from fornada_api.agents.attendant.prompt import load_system_prompt
 from tests.unit.agents.fakes import ScriptedChatModel, tool_call
@@ -70,9 +71,10 @@ async def get_order(order_id: int, phone: str) -> str:
 TOOLS = [search_catalog, check_capacity, calculate_quote, get_order]
 
 
-def build(model: ScriptedChatModel) -> tuple[GraphAttendant, Any]:
-    graph = build_graph(model, TOOLS, PROMPT).compile(checkpointer=InMemorySaver())
-    return GraphAttendant(graph), graph
+def build(model: ScriptedChatModel, *, capture_content: bool = False) -> tuple[GraphAttendant, Any]:
+    graph = build_graph(model, TOOLS, PROMPT, capture_content=capture_content)
+    compiled = graph.compile(checkpointer=InMemorySaver())
+    return GraphAttendant(compiled, capture_content=capture_content), compiled
 
 
 def turn_spans(exporter: InMemorySpanExporter) -> list[ReadableSpan]:
@@ -478,3 +480,225 @@ async def test_tool_spans_carry_no_arguments_or_results(spans: InMemorySpanExpor
         values = " ".join(str(v) for v in attrs(span).values())
         assert "98765-4321" not in values, span.name
         assert "confirmado" not in values, span.name
+
+
+# --- content capture -----------------------------------------------------------
+
+CONTENT_KEYS = {
+    tracing.GEN_AI_INPUT_MESSAGES,
+    tracing.GEN_AI_OUTPUT_MESSAGES,
+    tracing.GEN_AI_SYSTEM_INSTRUCTIONS,
+    tracing.GEN_AI_TOOL_CALL_ARGUMENTS,
+    tracing.GEN_AI_TOOL_CALL_RESULT,
+    tracing.FORNADA_CUSTOMER_PHONE,
+}
+
+
+def content(span: ReadableSpan, key: str) -> Any:
+    return json.loads(str(attrs(span)[key]))
+
+
+def texts(messages: list[dict[str, Any]]) -> list[str]:
+    return [p["content"] for m in messages for p in m["parts"] if p["type"] == "text"]
+
+
+async def test_chat_span_carries_input_output_and_instructions(
+    spans: InMemorySpanExporter,
+) -> None:
+    reply = answer("Temos sim!", response_metadata={"stop_reason": "end_turn"})
+    agent, _ = build(ScriptedChatModel(answers=[reply]), capture_content=True)
+    await agent.reply(uuid.uuid4(), "Quero um bolo de chocolate")
+
+    (chat,) = chat_spans(spans)
+    sent = content(chat, tracing.GEN_AI_INPUT_MESSAGES)
+    assert [m["role"] for m in sent] == ["user"]
+    assert texts(sent) == ["Quero um bolo de chocolate"]
+    assert content(chat, tracing.GEN_AI_SYSTEM_INSTRUCTIONS) == [
+        {"type": "text", "content": PROMPT.text}
+    ]
+    (out,) = content(chat, tracing.GEN_AI_OUTPUT_MESSAGES)
+    assert out["role"] == "assistant"
+    assert texts([out]) == ["Temos sim!"]
+    assert out["finish_reason"] == "end_turn"
+
+
+async def test_chat_span_output_carries_the_requested_tool(spans: InMemorySpanExporter) -> None:
+    model = ScriptedChatModel(
+        answers=[tool_call("search_catalog", {}, "toolu_01"), AIMessage("ok")]
+    )
+    agent, _ = build(model, capture_content=True)
+    await agent.reply(uuid.uuid4(), "catálogo")
+
+    first, second = chat_spans(spans)
+    (out,) = content(first, tracing.GEN_AI_OUTPUT_MESSAGES)
+    assert out["parts"] == [
+        {"type": "tool_call", "id": "toolu_01", "name": "search_catalog", "arguments": {}}
+    ]
+    # The next call sends the whole history, tool result included.
+    roles = [m["role"] for m in content(second, tracing.GEN_AI_INPUT_MESSAGES)]
+    assert roles == ["user", "assistant", "tool"]
+
+
+async def test_failed_chat_span_carries_input_only(spans: InMemorySpanExporter) -> None:
+    agent, _ = build(FailingChatModel(answers=[AIMessage("nunca")]), capture_content=True)
+    with pytest.raises(ProviderDown):
+        await agent.reply(uuid.uuid4(), "oi")
+
+    (chat,) = chat_spans(spans)
+    assert texts(content(chat, tracing.GEN_AI_INPUT_MESSAGES)) == ["oi"]
+    assert tracing.GEN_AI_SYSTEM_INSTRUCTIONS in attrs(chat)
+    assert tracing.GEN_AI_OUTPUT_MESSAGES not in attrs(chat)
+
+
+async def test_turn_span_carries_the_message_and_the_replies(
+    spans: InMemorySpanExporter,
+) -> None:
+    model = ScriptedChatModel(
+        answers=[
+            AIMessage(
+                "Vou olhar o catálogo.",
+                tool_calls=[{"name": "search_catalog", "args": {}, "id": "c1"}],
+            ),
+            AIMessage("Temos bolo de chocolate."),
+        ]
+    )
+    agent, _ = build(model, capture_content=True)
+    replies = await agent.reply(uuid.uuid4(), "Oi")
+
+    (turn,) = turn_spans(spans)
+    sent = content(turn, tracing.GEN_AI_INPUT_MESSAGES)
+    assert [m["role"] for m in sent] == ["user"]
+    assert texts(sent) == ["Oi"]
+    out = content(turn, tracing.GEN_AI_OUTPUT_MESSAGES)
+    assert {m["role"] for m in out} == {"assistant"}
+    assert texts(out) == replies == ["Vou olhar o catálogo.", "Temos bolo de chocolate."]
+
+
+async def test_turn_span_output_is_the_fallback_when_there_is_no_text(
+    spans: InMemorySpanExporter,
+) -> None:
+    agent, _ = build(ScriptedChatModel(answers=[AIMessage("")]), capture_content=True)
+    await agent.reply(uuid.uuid4(), "oi")
+
+    (turn,) = turn_spans(spans)
+    assert texts(content(turn, tracing.GEN_AI_OUTPUT_MESSAGES)) == [FALLBACK_REPLY]
+
+
+async def test_failed_turn_span_carries_input_only(spans: InMemorySpanExporter) -> None:
+    agent, _ = build(FailingChatModel(answers=[AIMessage("nunca")]), capture_content=True)
+    with pytest.raises(ProviderDown):
+        await agent.reply(uuid.uuid4(), "oi")
+
+    (turn,) = turn_spans(spans)
+    assert texts(content(turn, tracing.GEN_AI_INPUT_MESSAGES)) == ["oi"]
+    assert tracing.GEN_AI_OUTPUT_MESSAGES not in attrs(turn)
+
+
+async def test_tool_span_carries_arguments_and_result(spans: InMemorySpanExporter) -> None:
+    model = ScriptedChatModel(
+        answers=[tool_call("check_capacity", {"date": "2026-10-20"}, "c1"), AIMessage("ok")]
+    )
+    agent, _ = build(model, capture_content=True)
+    await agent.reply(uuid.uuid4(), "tem vaga?")
+
+    (span,) = tool_spans(spans)
+    assert content(span, tracing.GEN_AI_TOOL_CALL_ARGUMENTS) == {"date": "2026-10-20"}
+    assert attrs(span)[tracing.GEN_AI_TOOL_CALL_RESULT] == "5 kg"
+
+
+async def test_tool_span_carries_the_error_result(spans: InMemorySpanExporter) -> None:
+    model = ScriptedChatModel(
+        answers=[tool_call("calculate_quote", {"weight_kg": 2.3}, "c1"), AIMessage("ok")]
+    )
+    agent, _ = build(model, capture_content=True)
+    await agent.reply(uuid.uuid4(), "2,3 kg")
+
+    (span,) = tool_spans(spans)
+    assert "0.5 kg" in str(attrs(span)[tracing.GEN_AI_TOOL_CALL_RESULT])
+
+
+async def phone_attrs(
+    spans: InMemorySpanExporter, phone: str, *, capture_content: bool = True
+) -> dict[str, Any]:
+    """The `execute_tool get_order` span's attributes after a call with `phone`."""
+    model = ScriptedChatModel(
+        answers=[tool_call("get_order", {"order_id": 42, "phone": phone}, "c1"), AIMessage("ok")]
+    )
+    agent, _ = build(model, capture_content=capture_content)
+    await agent.reply(uuid.uuid4(), "meu pedido")
+    (span,) = tool_spans(spans)
+    return attrs(span)
+
+
+async def test_tool_span_names_the_customer_phone(spans: InMemorySpanExporter) -> None:
+    found = await phone_attrs(spans, "(81) 99999-1234")
+    assert found[tracing.FORNADA_CUSTOMER_PHONE] == "+5581999991234"
+
+
+async def test_invalid_phone_is_left_out(spans: InMemorySpanExporter) -> None:
+    assert tracing.FORNADA_CUSTOMER_PHONE not in await phone_attrs(spans, "abc")
+
+
+async def test_no_phone_without_capture(spans: InMemorySpanExporter) -> None:
+    found = await phone_attrs(spans, "(81) 99999-1234", capture_content=False)
+    assert tracing.FORNADA_CUSTOMER_PHONE not in found
+
+
+async def test_tool_without_phone_has_no_phone(spans: InMemorySpanExporter) -> None:
+    model = ScriptedChatModel(answers=[tool_call("search_catalog", {}, "c1"), AIMessage("ok")])
+    agent, _ = build(model, capture_content=True)
+    await agent.reply(uuid.uuid4(), "catálogo")
+
+    (span,) = tool_spans(spans)
+    assert tracing.FORNADA_CUSTOMER_PHONE not in attrs(span)
+
+
+async def test_no_content_attributes_without_capture(spans: InMemorySpanExporter) -> None:
+    model = ScriptedChatModel(
+        answers=[
+            tool_call("get_order", {"order_id": 42, "phone": "81999991234"}, "c1"),
+            AIMessage("ok"),
+        ]
+    )
+    agent, _ = build(model)
+    await agent.reply(uuid.uuid4(), "meu pedido")
+
+    for span in spans.get_finished_spans():
+        assert not CONTENT_KEYS & attrs(span).keys(), span.name
+
+
+async def test_no_tool_definitions_on_spans(spans: InMemorySpanExporter) -> None:
+    model = ScriptedChatModel(answers=[tool_call("search_catalog", {}, "c1"), AIMessage("ok")])
+    agent, _ = build(model, capture_content=True)
+    await agent.reply(uuid.uuid4(), "catálogo")
+
+    for span in spans.get_finished_spans():
+        assert "gen_ai.tool.definitions" not in attrs(span), span.name
+        values = " ".join(str(v) for v in attrs(span).values())
+        assert "Lists the cakes." not in values, span.name
+
+
+async def test_same_turn_with_and_without_content_capture(
+    spans: InMemorySpanExporter,
+) -> None:
+    async def run(capture_content: bool) -> tuple[list[list[str]], list[BaseMessage]]:
+        model = ScriptedChatModel(
+            answers=[
+                tool_call("search_catalog", {}, "c1"),
+                AIMessage("Temos bolo"),
+                AIMessage("ok"),
+            ]
+        )
+        agent, graph = build(model, capture_content=capture_content)
+        conversation = uuid.uuid4()
+        replies = [
+            await agent.reply(conversation, "catálogo"),
+            await agent.reply(conversation, "ok"),
+        ]
+        config = {"configurable": {"thread_id": str(conversation)}}
+        return replies, (await graph.aget_state(config)).values["messages"]
+
+    captured_replies, captured_stored = await run(True)
+    plain_replies, plain_stored = await run(False)
+    assert captured_replies == plain_replies == [["Temos bolo"], ["ok"]]
+    assert comparable(captured_stored) == comparable(plain_stored)

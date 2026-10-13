@@ -14,7 +14,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "the pipelines in the C
 ## 3. Content attributes on agent spans
 
 - [x] 3.1 Add the attribute names to `agents/attendant/tracing.py`: `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.system_instructions`, `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result` and `fornada.customer.phone`. Also add a serializer from LangChain messages to semconv message JSON (text, `tool_call` and `tool_call_response` parts, and `finish_reason` on output; design.md, decision 1). Add unit tests for the serializer covering a user message, an AI message with text, an AI message with two tool calls and a tool message. Verify the tests pass.
-- [ ] 3.2 Write failing tests in `tests/unit/agents/test_agent_tracing.py` for the `agent-tracing` delta:
+- [x] 3.2 Write failing tests in `tests/unit/agents/test_agent_tracing.py` for the `agent-tracing` delta:
   - `chat` input, output and system instructions with capture on, including the tool-call answer and the provider error case;
   - `invoke_agent` input and output with one message and two replies;
   - `execute_tool` arguments and result, including the error result;
@@ -24,7 +24,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "the pipelines in the C
   - the same replies and stored messages with capture on and off.
 
   Verify they fail.
-- [ ] 3.3 Pass `capture_content` from the settings to `build_graph` and `GraphAttendant`, then set the attributes in `attendant.py` (turn span), in `nodes.py` (`call_model` and the `execute_tool` wrapper; the phone goes through `normalize_phone`, design.md decision 3), all behind the switch. Mirror the existing span code. Verify the 3.2 tests pass and `uv run task check` passes.
+- [x] 3.3 Pass `capture_content` from the settings to `build_graph` and `GraphAttendant`, then set the attributes in `attendant.py` (turn span), in `nodes.py` (`call_model` and the `execute_tool` wrapper; the phone goes through `normalize_phone`, design.md decision 3), all behind the switch. Mirror the existing span code. Verify the 3.2 tests pass and `uv run task check` passes.
 
 ## 4. Elasticsearch user and secrets
 
