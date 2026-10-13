@@ -92,6 +92,11 @@ The first implementation task sends one span with `gen_ai.input.messages` to Lan
 
 This keeps `langfuse.*` attributes out of app code, as `add-agent-spans` decided. Copying adds attributes and leaves the original content untouched, so the spec's "exactly as the app sent them" still holds.
 
+**Observed (task 1.1, Langfuse v4.53, 2026-10-13):** a synthetic trace with the semconv attributes (`b9a0f9cda2cdb0685b6b9f2c4ac8198f`) rendered fully with no Collector mapping, so the fallback is not needed:
+- `invoke_agent`: `gen_ai.input.messages` and `gen_ai.output.messages` appear as User and Assistant.
+- `chat`: `gen_ai.system_instructions` appears as System, the input as User, and a `tool_call` output part as an Assistant tool call, with name, call id and arguments.
+- `execute_tool`: `gen_ai.tool.call.arguments` and `gen_ai.tool.call.result` appear as Input and Output, parsed as JSON. The observation is shown under the tool name (`get_order`).
+
 ### 7. Elasticsearch user for the Collector
 
 `elasticsearch-setup` gains two idempotent calls, a `PUT` for the role and a `PUT` for the user, run before the existing `kibana_system` call:

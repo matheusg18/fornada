@@ -4,7 +4,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "the pipelines in the C
 
 ## 1. Check how Langfuse renders the content attributes
 
-- [ ] 1.1 Send one synthetic trace from `dev` to the Collector, using a short Python script in the scratchpad with the OTLP/HTTP exporter. It has one span with `gen_ai.operation.name=chat`, `gen_ai.input.messages`, `gen_ai.output.messages` and `gen_ai.system_instructions` in semconv JSON, and one span with `gen_ai.tool.call.arguments` and `gen_ai.tool.call.result`. Ask the maintainer to open it in Langfuse and record whether the input and output render on each observation (design.md, decision 6). Verify with the maintainer's answer, written into design.md decision 6 as "observed".
+- [x] 1.1 Send one synthetic trace from `dev` to the Collector, using a short Python script in the scratchpad with the OTLP/HTTP exporter. It has one span with `gen_ai.operation.name=chat`, `gen_ai.input.messages`, `gen_ai.output.messages` and `gen_ai.system_instructions` in semconv JSON, and one span with `gen_ai.tool.call.arguments` and `gen_ai.tool.call.result`. Ask the maintainer to open it in Langfuse and record whether the input and output render on each observation (design.md, decision 6). Verify with the maintainer's answer, written into design.md decision 6 as "observed".
 
 ## 2. Content capture setting
 
