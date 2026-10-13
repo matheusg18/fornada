@@ -242,6 +242,25 @@ def test_invalid_tracing_switch(
         load()
 
 
+def test_content_capture_off_by_default(with_key: None) -> None:
+    assert load().telemetry.capture_content is False
+
+
+def test_content_capture_on(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TELEMETRY__ENABLED", "true")
+    monkeypatch.setenv("TELEMETRY__CAPTURE_CONTENT", "true")
+    assert load().telemetry.capture_content is True
+
+
+@pytest.mark.parametrize("value", ["maybe", "2"])
+def test_invalid_content_capture_switch(
+    value: str, with_key: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TELEMETRY__CAPTURE_CONTENT", value)
+    with pytest.raises(ConfigError, match="TELEMETRY__CAPTURE_CONTENT"):
+        load()
+
+
 def test_default_otlp_endpoint(with_key: None) -> None:
     assert load().telemetry.otlp_endpoint == "http://edot-collector:4318"
 

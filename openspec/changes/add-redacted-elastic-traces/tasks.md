@@ -8,8 +8,8 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "the pipelines in the C
 
 ## 2. Content capture setting
 
-- [ ] 2.1 Write failing tests in the settings test module for `TELEMETRY__CAPTURE_CONTENT`: default off, `true` turns it on, and `maybe` fails with an error naming the variable (`app-config` delta). Verify they fail.
-- [ ] 2.2 Add `capture_content: bool = False` to `TelemetrySettings`, document it in the root `.env.example`, and pass it to the graph where provider and model are passed (design.md, decision 2). Verify the 2.1 tests pass and `uv run task check` passes.
+- [x] 2.1 Write failing tests in the settings test module for `TELEMETRY__CAPTURE_CONTENT`: default off, `true` turns it on, and `maybe` fails with an error naming the variable (`app-config` delta). Verify they fail.
+- [x] 2.2 Add `capture_content: bool = False` to `TelemetrySettings` and document it in the root `.env.example` (design.md, decision 2). Passing it to the graph and the attendant moves to 3.3, where it is used and tested. Verify the 2.1 tests pass and `uv run task check` passes.
 
 ## 3. Content attributes on agent spans
 
@@ -24,7 +24,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: "the pipelines in the C
   - the same replies and stored messages with capture on and off.
 
   Verify they fail.
-- [ ] 3.3 Set the attributes in `attendant.py` (turn span), in `nodes.py` (`call_model` and the `execute_tool` wrapper; the phone goes through `normalize_phone`, design.md decision 3), all behind the switch. Mirror the existing span code. Verify the 3.2 tests pass and `uv run task check` passes.
+- [ ] 3.3 Pass `capture_content` from the settings to `build_graph` and `GraphAttendant`, then set the attributes in `attendant.py` (turn span), in `nodes.py` (`call_model` and the `execute_tool` wrapper; the phone goes through `normalize_phone`, design.md decision 3), all behind the switch. Mirror the existing span code. Verify the 3.2 tests pass and `uv run task check` passes.
 
 ## 4. Elasticsearch user and secrets
 
