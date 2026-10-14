@@ -26,7 +26,7 @@ receivers:
 # exporter adds /v1/traces. The ingestion-version header makes spans show up
 # in real time instead of up to 10 minutes later.
 exporters:
-  otlphttp/langfuse:
+  otlp_http/langfuse:
     endpoint: "http://langfuse-web:3000/api/public/otel"
     headers:
       Authorization: "Basic ${env:LANGFUSE_OTLP_AUTH}"
@@ -77,9 +77,9 @@ service:
   pipelines:
     traces/langfuse:
       receivers: [otlp]
-      # No processors: the app already batches spans and otlphttp queues and
+      # No processors: the app already batches spans and otlp_http queues and
       # retries on its own.
-      exporters: [otlphttp/langfuse]
+      exporters: [otlp_http/langfuse]
 
     # Same receiver, second pipeline: this is the fan-out. The Collector
     # hands each pipeline whose processors change data its own copy, so

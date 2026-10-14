@@ -155,7 +155,7 @@ curl -s edot-collector:8888/metrics | grep -E '^otelcol_(receiver_accepted|expor
 docker compose -p fornada_devcontainer logs edot-collector
 ```
 
-`otelcol_exporter_sent_spans{exporter="otlphttp/langfuse"}` grows with every
+`otelcol_exporter_sent_spans{exporter="otlp_http/langfuse"}` grows with every
 export; a growing `send_failed_spans` usually means a 401 (wrong
 `LANGFUSE_OTLP_AUTH`) or a 404 (wrong endpoint path).
 
