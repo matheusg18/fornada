@@ -1,9 +1,11 @@
 # EDOT Collector config for the dev environment, mounted read-only into the
 # `edot-collector` service (.devcontainer/compose.yaml).
 #
-# Traces go from OTLP to Langfuse (the LLM view), over the compose network.
-# Elasticsearch, the logs and metrics pipelines and the redaction processors
-# come in phase 2 step B.
+# Traces fan out from one OTLP receiver to two pipelines, over the compose
+# network: Langfuse (the LLM view) gets every span as the app sent it, with
+# conversation content; Elasticsearch (Kibana APM) gets them redacted, with no
+# content and the customer phone only as a salted hash. Logs and metrics
+# pipelines come later in phase 2 step B.
 #
 # Components and config keys follow EDOT 9.5.5, which is built on Collector
 # core v0.161.0.
@@ -29,12 +31,31 @@ exporters:
     headers:
       Authorization: "Basic ${env:LANGFUSE_OTLP_AUTH}"
       x-langfuse-ingestion-version: "4"
+  # Kibana APM's data: spans as `traces-*` data streams, and the APM metrics
+  # the `elasticapm` connector builds as `metrics-*`. `otel` mapping keeps the
+  # OTel attribute names. Logs in as `otel_collector`, a write-only user that
+  # elasticsearch-setup creates (compose.yaml).
+  elasticsearch/otel:
+    endpoint: http://elasticsearch:9200
+    user: otel_collector
+    password: ${env:ELASTIC_OTEL_PASSWORD}
+    mapping:
+      mode: otel
+
+# Kibana APM needs both (EDOT docs): the processor enriches spans with the
+# fields the APM UI reads, the connector turns spans into pre-aggregated APM
+# metrics (latency, throughput, error rate). Both ship with EDOT only.
+processors:
+  elasticapm: {}
+
+connectors:
+  elasticapm: {}
 
 service:
-  # Traces only. Logs and metrics pipelines arrive with Elasticsearch and the
-  # redaction processors, so no message text reaches a log unredacted.
+  # Traces only. Logs and metrics pipelines come with the app's logger and
+  # meter providers.
   pipelines:
-    traces:
+    traces/langfuse:
       receivers: [otlp]
       # No processors: the app already batches spans and otlphttp queues and
       # retries on its own.
