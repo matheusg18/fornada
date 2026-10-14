@@ -12,7 +12,7 @@ from langchain_core.messages import AIMessage, AnyMessage, HumanMessage
 from langgraph.graph.state import CompiledStateGraph
 from opentelemetry.trace import SpanKind, StatusCode
 
-from fornada_api.agents.attendant import tracing
+from fornada_api.agents.attendant import span_content, tracing
 
 FALLBACK_REPLY = "Desculpe, não consegui responder agora. Pode repetir?"
 # About 12 model-tool rounds. Protects the token budget from a runaway tool
@@ -43,10 +43,14 @@ class GraphAttendant:
         self,
         graph: CompiledStateGraph[Any, Any, Any, Any],
         before_turn: Callable[[], Awaitable[None]] | None = None,
+        *,
+        capture_content: bool = False,
     ) -> None:
         self._graph = graph
         # Runs before every turn, for one-time setup such as the checkpointer tables.
         self._before_turn = before_turn
+        # Puts the customer message and the replies on the turn span.
+        self._capture_content = capture_content
 
     async def reply(self, conversation_id: UUID, text: str) -> list[str]:
         if self._before_turn:
@@ -56,18 +60,21 @@ class GraphAttendant:
             "recursion_limit": RECURSION_LIMIT,
         }
         conversation = str(conversation_id)
+        attributes = {
+            tracing.GEN_AI_OPERATION_NAME: tracing.OP_INVOKE_AGENT,
+            tracing.GEN_AI_AGENT_NAME: tracing.AGENT_NAME,
+            tracing.GEN_AI_CONVERSATION_ID: conversation,
+            tracing.SESSION_ID: conversation,
+        }
+        if self._capture_content:
+            attributes[tracing.GEN_AI_INPUT_MESSAGES] = span_content.text_messages("user", [text])
         # The turn span. Nodes run inside it, so `chat` and `execute_tool`
         # spans become its children. Attributes known up front go in at
         # creation, where samplers can see them.
         with tracing.tracer.start_as_current_span(
             f"{tracing.OP_INVOKE_AGENT} {tracing.AGENT_NAME}",
             kind=SpanKind.INTERNAL,
-            attributes={
-                tracing.GEN_AI_OPERATION_NAME: tracing.OP_INVOKE_AGENT,
-                tracing.GEN_AI_AGENT_NAME: tracing.AGENT_NAME,
-                tracing.GEN_AI_CONVERSATION_ID: conversation,
-                tracing.SESSION_ID: conversation,
-            },
+            attributes=attributes,
             # The default status description is "Type: message", and a message
             # can carry customer data. The status is set below, without one.
             set_status_on_exception=False,
@@ -81,4 +88,10 @@ class GraphAttendant:
                 raise
             # Known only after the graph ran: the version the model calls used.
             span.set_attribute(tracing.FORNADA_PROMPT_VERSION, output["prompt_version"])
-        return turn_replies(output["messages"]) or [FALLBACK_REPLY]
+            replies = turn_replies(output["messages"]) or [FALLBACK_REPLY]
+            if self._capture_content:
+                span.set_attribute(
+                    tracing.GEN_AI_OUTPUT_MESSAGES,
+                    span_content.text_messages("assistant", replies),
+                )
+        return replies

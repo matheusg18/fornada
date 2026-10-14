@@ -199,10 +199,21 @@ services:
     image: docker.elastic.co/elastic-agent/elastic-otel-collector:9.5.5
     restart: unless-stopped
     command: ["--config", "/etc/otelcol/config.yaml"]
+    # The Elasticsearch exporter logs in as `otel_collector`, which
+    # elasticsearch-setup creates. This also delays Langfuse export until
+    # Elasticsearch is healthy on a cold start; `dev` does not wait for it.
+    depends_on:
+      elasticsearch-setup:
+        condition: service_completed_successfully
     environment:
       # HTTP Basic credential for the Langfuse exporter, read by the config as
       # ${env:LANGFUSE_OTLP_AUTH}. Only this service gets it.
       LANGFUSE_OTLP_AUTH: ${LANGFUSE_OTLP_AUTH:?}
+      # Password of `otel_collector`, the write-only Elasticsearch user.
+      ELASTIC_OTEL_PASSWORD: ${ELASTIC_OTEL_PASSWORD:?}
+      # Salt for the phone hash in the Elasticsearch pipeline. With it, the same
+      # phone always gets the same hash, and the hash cannot be brute-forced.
+      PHONE_HASH_SALT: ${PHONE_HASH_SALT:?}
     volumes:
       - ./otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
 
@@ -246,10 +257,15 @@ services:
       start_period: 30s
 
   elasticsearch-setup:
-    # One-shot: sets the built-in `kibana_system` password, then exits 0. The
-    # call is idempotent, so it runs on every start and also repairs a volume
-    # whose password came from an older secret. Uses the Elasticsearch image
-    # for its curl.
+    # One-shot, then exits 0:
+    # 1. role `otel_writer`: create documents (and let the first write create
+    #    the data stream) in the exporter's default data streams, nothing else.
+    #    No cluster privilege: the exporter does no node discovery.
+    # 2. user `otel_collector` with that role, for the Collector.
+    # 3. the built-in `kibana_system` password.
+    # Every call is a PUT/POST of the full state, so it runs on every start and
+    # also repairs a volume whose passwords came from older secrets. Uses the
+    # Elasticsearch image for its curl.
     image: docker.elastic.co/elasticsearch/elasticsearch:9.5.5
     restart: "no"
     depends_on:
@@ -258,15 +274,16 @@ services:
     environment:
       ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:?}
       KIBANA_SYSTEM_PASSWORD: ${KIBANA_SYSTEM_PASSWORD:?}
+      ELASTIC_OTEL_PASSWORD: ${ELASTIC_OTEL_PASSWORD:?}
     command:
       - bash
-      - -c
-      - >-
-        curl -fsS -u "elastic:$$ELASTIC_PASSWORD"
-        -H 'Content-Type: application/json'
-        -d "{\"password\":\"$$KIBANA_SYSTEM_PASSWORD\"}"
-        http://elasticsearch:9200/_security/user/kibana_system/_password
-        && echo ' kibana_system password set'
+      - -ec
+      - |
+        es() { curl -fsS -u "elastic:$$ELASTIC_PASSWORD" -H 'Content-Type: application/json' -X "$$1" "http://elasticsearch:9200$$2" -d "$$3"; echo; }
+        es PUT /_security/role/otel_writer '{"cluster":[],"indices":[{"names":["traces-*-*","metrics-*-*","logs-*-*"],"privileges":["auto_configure","create_doc"]}]}'
+        es PUT /_security/user/otel_collector "{\"password\":\"$$ELASTIC_OTEL_PASSWORD\",\"roles\":[\"otel_writer\"]}"
+        es POST /_security/user/kibana_system/_password "{\"password\":\"$$KIBANA_SYSTEM_PASSWORD\"}"
+        echo 'otel_writer, otel_collector and kibana_system password set'
 
   kibana:
     # Connects as `kibana_system` (Kibana refuses the `elastic` superuser).

@@ -12,18 +12,27 @@ from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command
 from opentelemetry.trace import Span, SpanKind, StatusCode
 
-from fornada_api.agents.attendant import tracing
+from fornada_api.agents.attendant import span_content, tracing
 from fornada_api.agents.attendant.prompt import SystemPrompt
 from fornada_api.agents.attendant.state import AttendantState
+from fornada_api.services.errors import InvalidPhone
+from fornada_api.services.phones import normalize_phone
 
 PROMPT_VERSION_KEY = "prompt_version"
 
 
-def make_call_model(model: BaseChatModel, tools: Sequence[BaseTool], prompt: SystemPrompt):
+def make_call_model(
+    model: BaseChatModel,
+    tools: Sequence[BaseTool],
+    prompt: SystemPrompt,
+    capture_content: bool = False,
+):
     """The model node, with `tools` bound to `model` once, when the graph is built.
 
     The system prompt goes first in every call and is never returned, so it is
     not saved in the conversation. The answer records the prompt version.
+    With `capture_content`, the `chat` span also carries what was sent and
+    what came back.
     """
     model_with_tools = model.bind_tools(list(tools))
     # Read once, when the graph is built: `ChatAnthropic` and `ChatOpenAI` give
@@ -46,6 +55,14 @@ def make_call_model(model: BaseChatModel, tools: Sequence[BaseTool], prompt: Sys
         if thread_id is not None:
             attributes[tracing.GEN_AI_CONVERSATION_ID] = str(thread_id)
             attributes[tracing.SESSION_ID] = str(thread_id)
+        # Input at span start, so a failed call still shows what was sent.
+        if capture_content:
+            attributes[tracing.GEN_AI_SYSTEM_INSTRUCTIONS] = span_content.system_instructions(
+                prompt.text
+            )
+            attributes[tracing.GEN_AI_INPUT_MESSAGES] = span_content.input_messages(
+                state["messages"]
+            )
 
         # CLIENT: the model runs at the provider, outside this process. The
         # httpx2 span of the HTTP request starts inside it, as its child.
@@ -65,6 +82,10 @@ def make_call_model(model: BaseChatModel, tools: Sequence[BaseTool], prompt: Sys
                 span.set_attribute(tracing.ERROR_TYPE, type(error).__name__)
                 raise
             set_response_attributes(span, answer)
+            if capture_content and isinstance(answer, AIMessage):
+                span.set_attribute(
+                    tracing.GEN_AI_OUTPUT_MESSAGES, span_content.output_messages(answer)
+                )
 
         answer.response_metadata = {**answer.response_metadata, PROMPT_VERSION_KEY: prompt.version}
         return {"messages": [answer], PROMPT_VERSION_KEY: prompt.version}
@@ -107,45 +128,71 @@ ToolHandler = Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]]
 TOOL_ERROR = "tool_error"
 
 
-async def wrap_tool_call(request: ToolCallRequest, handler: ToolHandler) -> ToolMessage | Command:
-    """The `execute_tool` span around each tool call `ToolNode` makes.
+def make_wrap_tool_call(capture_content: bool = False):
+    """The `ToolNode` wrapper; `capture_content` adds arguments, result and phone."""
 
-    It runs in that call's own task, so concurrent calls of one model answer
-    get sibling spans, each a child of the turn span. Tools see this span as
-    the current one, so a tool can add its own attributes to it.
-    """
-    call = request.tool_call
-    name = call["name"]
-    attributes = {
-        tracing.GEN_AI_OPERATION_NAME: tracing.OP_EXECUTE_TOOL,
-        tracing.GEN_AI_TOOL_NAME: name,
-        tracing.GEN_AI_TOOL_TYPE: tracing.TOOL_TYPE_FUNCTION,
-    }
-    if call_id := call.get("id"):
-        attributes[tracing.GEN_AI_TOOL_CALL_ID] = call_id
-    thread_id = (request.runtime.config.get("configurable") or {}).get("thread_id")
-    if thread_id is not None:
-        attributes[tracing.GEN_AI_CONVERSATION_ID] = str(thread_id)
-        attributes[tracing.SESSION_ID] = str(thread_id)
+    async def wrap_tool_call(
+        request: ToolCallRequest, handler: ToolHandler
+    ) -> ToolMessage | Command:
+        """The `execute_tool` span around each tool call `ToolNode` makes.
 
-    with tracing.tracer.start_as_current_span(
-        f"{tracing.OP_EXECUTE_TOOL} {name}",
-        kind=SpanKind.INTERNAL,
-        attributes=attributes,
-        set_status_on_exception=False,
-    ) as span:
-        try:
-            result = await handler(request)
-        except Exception as error:
-            # Rare: our tools turn their errors into error results. Anything
-            # else still reaches here and fails the turn.
-            span.set_status(StatusCode.ERROR)
-            span.set_attribute(tracing.ERROR_TYPE, type(error).__name__)
-            raise
-        # A result, not an exception, is how tools fail here (`handle_tool_error`
-        # and ToolNode's argument validation). The turn goes on: the model reads
-        # the error, so only this span is marked.
-        if isinstance(result, ToolMessage) and result.status == "error":
-            span.set_status(StatusCode.ERROR)
-            span.set_attribute(tracing.ERROR_TYPE, TOOL_ERROR)
-        return result
+        It runs in that call's own task, so concurrent calls of one model answer
+        get sibling spans, each a child of the turn span. Tools see this span as
+        the current one, so a tool can add its own attributes to it.
+        """
+        call = request.tool_call
+        name = call["name"]
+        attributes = {
+            tracing.GEN_AI_OPERATION_NAME: tracing.OP_EXECUTE_TOOL,
+            tracing.GEN_AI_TOOL_NAME: name,
+            tracing.GEN_AI_TOOL_TYPE: tracing.TOOL_TYPE_FUNCTION,
+        }
+        if call_id := call.get("id"):
+            attributes[tracing.GEN_AI_TOOL_CALL_ID] = call_id
+        thread_id = (request.runtime.config.get("configurable") or {}).get("thread_id")
+        if thread_id is not None:
+            attributes[tracing.GEN_AI_CONVERSATION_ID] = str(thread_id)
+            attributes[tracing.SESSION_ID] = str(thread_id)
+        if capture_content:
+            attributes[tracing.GEN_AI_TOOL_CALL_ARGUMENTS] = span_content.to_json(call["args"])
+            if phone := customer_phone(call["args"]):
+                attributes[tracing.FORNADA_CUSTOMER_PHONE] = phone
+
+        with tracing.tracer.start_as_current_span(
+            f"{tracing.OP_EXECUTE_TOOL} {name}",
+            kind=SpanKind.INTERNAL,
+            attributes=attributes,
+            set_status_on_exception=False,
+        ) as span:
+            try:
+                result = await handler(request)
+            except Exception as error:
+                # Rare: our tools turn their errors into error results. Anything
+                # else still reaches here and fails the turn.
+                span.set_status(StatusCode.ERROR)
+                span.set_attribute(tracing.ERROR_TYPE, type(error).__name__)
+                raise
+            # A result, not an exception, is how tools fail here (`handle_tool_error`
+            # and ToolNode's argument validation). The turn goes on: the model reads
+            # the error, so only this span is marked.
+            if isinstance(result, ToolMessage) and result.status == "error":
+                span.set_status(StatusCode.ERROR)
+                span.set_attribute(tracing.ERROR_TYPE, TOOL_ERROR)
+            if capture_content and isinstance(result, ToolMessage):
+                span.set_attribute(tracing.GEN_AI_TOOL_CALL_RESULT, result.text)
+            return result
+
+    return wrap_tool_call
+
+
+def customer_phone(args: dict[str, Any]) -> str | None:
+    """The `phone` argument in E.164, or None. Every tool that takes a phone
+    names it `phone`. A value that does not normalize is left out: it can be
+    any text the model produced, and the Collector would hash it as a phone."""
+    raw = args.get("phone")
+    if not isinstance(raw, str):
+        return None
+    try:
+        return normalize_phone(raw)
+    except InvalidPhone:
+        return None

@@ -35,9 +35,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         # request. None when tracing is off.
         tracer_provider = setup_tracing(settings.telemetry)
         await checkpointer.open()
-        graph = build_graph(build_chat_model(settings.llm), default_tools(), prompt)
+        # Content only matters when spans are exported; with tracing off, skip
+        # building it.
+        capture = settings.telemetry.enabled and settings.telemetry.capture_content
+        graph = build_graph(
+            build_chat_model(settings.llm), default_tools(), prompt, capture_content=capture
+        )
         app.state.attendant = GraphAttendant(
-            graph.compile(checkpointer=checkpointer.saver), before_turn=checkpointer.ensure_setup
+            graph.compile(checkpointer=checkpointer.saver),
+            before_turn=checkpointer.ensure_setup,
+            capture_content=capture,
         )
         logger.info(
             "fornada-api starting",

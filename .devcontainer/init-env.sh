@@ -48,6 +48,8 @@ MINIO_ROOT_PASSWORD=$(hex 24)
 ELASTIC_PASSWORD=$(hex 24)
 KIBANA_SYSTEM_PASSWORD=$(hex 24)
 KIBANA_ENCRYPTION_KEY=$(hex 32)
+ELASTIC_OTEL_PASSWORD=$(hex 24)
+PHONE_HASH_SALT=$(hex 32)
 EOF
   chmod 600 "$env_file"
   echo "Created .devcontainer/.env with random secrets."
@@ -70,3 +72,5 @@ fi
 ensure_secret ELASTIC_PASSWORD "$(hex 24)"
 ensure_secret KIBANA_SYSTEM_PASSWORD "$(hex 24)"
 ensure_secret KIBANA_ENCRYPTION_KEY "$(hex 32)"
+ensure_secret ELASTIC_OTEL_PASSWORD "$(hex 24)"
+ensure_secret PHONE_HASH_SALT "$(hex 32)"

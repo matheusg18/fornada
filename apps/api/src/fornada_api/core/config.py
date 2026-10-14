@@ -93,6 +93,10 @@ class TelemetrySettings(BaseModel):
     # Base URL of the Collector's OTLP/HTTP receiver; the signal path
     # (`/v1/traces`) is appended by the telemetry setup.
     otlp_endpoint: str = "http://edot-collector:4318"
+    # Message text, tool arguments and results, and customer phones on agent
+    # spans. Off by default: the GenAI semconv makes content opt-in, and the
+    # Collector strips it before Elasticsearch, not before Langfuse.
+    capture_content: bool = False
 
     @field_validator("otlp_endpoint")
     @classmethod

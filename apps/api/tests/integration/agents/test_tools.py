@@ -22,7 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from fornada_api.agents.attendant import tracing
-from fornada_api.agents.attendant.nodes import wrap_tool_call
+from fornada_api.agents.attendant.nodes import make_wrap_tool_call
 from fornada_api.agents.attendant.tools import build_tools
 from fornada_api.models import Customer, Escalation, Order, OrderStatus, SentMessage
 from fornada_api.services.clock import SystemClock
@@ -40,7 +40,7 @@ class ToolRunner:
     def __init__(self, tools: list[BaseTool]) -> None:
         graph = StateGraph(MessagesState)
         # The production wrapper, so tools run inside their `execute_tool` span.
-        graph.add_node("tools", ToolNode(tools, awrap_tool_call=wrap_tool_call))
+        graph.add_node("tools", ToolNode(tools, awrap_tool_call=make_wrap_tool_call()))
         graph.add_edge(START, "tools")
         graph.add_edge("tools", END)
         self.graph: CompiledStateGraph[Any, Any, Any, Any] = graph.compile()

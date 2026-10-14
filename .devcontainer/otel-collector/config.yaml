@@ -1,9 +1,11 @@
 # EDOT Collector config for the dev environment, mounted read-only into the
 # `edot-collector` service (.devcontainer/compose.yaml).
 #
-# Traces go from OTLP to Langfuse (the LLM view), over the compose network.
-# Elasticsearch, the logs and metrics pipelines and the redaction processors
-# come in phase 2 step B.
+# Traces fan out from one OTLP receiver to two pipelines, over the compose
+# network: Langfuse (the LLM view) gets every span as the app sent it, with
+# conversation content; Elasticsearch (Kibana APM) gets them redacted, with no
+# content and the customer phone only as a salted hash. Logs and metrics
+# pipelines come later in phase 2 step B.
 #
 # Components and config keys follow EDOT 9.5.5, which is built on Collector
 # core v0.161.0.
@@ -24,21 +26,76 @@ receivers:
 # exporter adds /v1/traces. The ingestion-version header makes spans show up
 # in real time instead of up to 10 minutes later.
 exporters:
-  otlphttp/langfuse:
+  otlp_http/langfuse:
     endpoint: "http://langfuse-web:3000/api/public/otel"
     headers:
       Authorization: "Basic ${env:LANGFUSE_OTLP_AUTH}"
       x-langfuse-ingestion-version: "4"
+  # Kibana APM's data: spans as `traces-*` data streams, and the APM metrics
+  # the `elasticapm` connector builds as `metrics-*`. `otel` mapping keeps the
+  # OTel attribute names. Logs in as `otel_collector`, a write-only user that
+  # elasticsearch-setup creates (compose.yaml).
+  elasticsearch/otel:
+    endpoint: http://elasticsearch:9200
+    user: otel_collector
+    password: ${env:ELASTIC_OTEL_PASSWORD}
+    mapping:
+      mode: otel
+
+# Kibana APM needs both (EDOT docs): the processor enriches spans with the
+# fields the APM UI reads, the connector turns spans into pre-aggregated APM
+# metrics (latency, throughput, error rate). Both ship with EDOT only.
+processors:
+  elasticapm: {}
+
+  # Redaction for Elasticsearch only (design.md, decision 5). It runs in
+  # `traces/elastic`, so Langfuse still gets the content.
+  transform/redact:
+    # Fail closed: a statement error drops the batch for Elasticsearch
+    # instead of exporting it half redacted (the default, `ignore`, would
+    # log the error and send the span on with the phone in clear). Langfuse
+    # is unaffected; the drop shows in this pipeline's metrics and log.
+    error_mode: propagate
+    trace_statements:
+      # Conversation content: messages, system prompt, tool arguments and
+      # results. Anchored, since the pattern matches anywhere in the key.
+      - delete_matching_keys(span.attributes, "^gen_ai\\.(input\\.messages|output\\.messages|system_instructions|tool\\.call\\.(arguments|result))$")
+      # Phone -> lowercase hex SHA-256 of salt + phone. The salt keeps the
+      # hash from being reversed by hashing every Brazilian number, and the
+      # same phone always gets the same hash, so Kibana can still group by it.
+      - set(span.attributes["fornada.customer.phone"], SHA256(Concat(["${env:PHONE_HASH_SALT}", span.attributes["fornada.customer.phone"]], ""))) where IsString(span.attributes["fornada.customer.phone"])
+      # The app only sends strings. Anything else is dropped, not hashed or
+      # passed on (SHA256 would fail on it).
+      - delete_key(span.attributes, "fornada.customer.phone") where span.attributes["fornada.customer.phone"] != nil and not IsString(span.attributes["fornada.customer.phone"])
+
+connectors:
+  elasticapm: {}
 
 service:
-  # Traces only. Logs and metrics pipelines arrive with Elasticsearch and the
-  # redaction processors, so no message text reaches a log unredacted.
+  # Traces only. Logs and metrics pipelines come with the app's logger and
+  # meter providers.
   pipelines:
-    traces:
+    traces/langfuse:
       receivers: [otlp]
-      # No processors: the app already batches spans and otlphttp queues and
+      # No processors: the app already batches spans and otlp_http queues and
       # retries on its own.
-      exporters: [otlphttp/langfuse]
+      exporters: [otlp_http/langfuse]
+
+    # Same receiver, second pipeline: this is the fan-out. The Collector
+    # hands each pipeline whose processors change data its own copy, so
+    # `transform/redact` never touches what `traces/langfuse` exports.
+    traces/elastic:
+      receivers: [otlp]
+      # Redaction first: `elasticapm` and the connector must never see the
+      # content, or it could end up in derived fields or metrics.
+      processors: [transform/redact, elasticapm]
+      exporters: [elasticsearch/otel, elasticapm]
+
+    # APM metrics the connector builds from the redacted spans (latency,
+    # throughput, error rate per service and transaction), for Kibana APM.
+    metrics/apm:
+      receivers: [elasticapm]
+      exporters: [elasticsearch/otel]
 
   # Internal metrics (otelcol_receiver_accepted_spans, otelcol_exporter_sent_spans)
   # on :8888, readable from the `dev` container, which has no Docker access:
