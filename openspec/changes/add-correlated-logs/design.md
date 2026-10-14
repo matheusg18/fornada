@@ -105,7 +105,7 @@ transform/redact_logs:
 
 - The same denylist, salt and fail-closed mode as `transform/redact`, on log attributes. Today the app puts none of these attributes on a log record. The statements are there so the guarantee holds per signal, not per call site: a future `logger.info(..., extra={"fornada.customer.phone": ...})` is hashed with no further change.
 - A separate processor, not `transform/redact` with a `log_statements` block added. Either works, because a `transform` processor carries statements per signal. Keeping them separate lets each pipeline's error count point to its own statements. The maintainer decides.
-- The `elasticapm` processor in the logs pipeline: the EDOT 9.5 gateway reference config is checked during implementation. If it lists `elasticapm` for logs (to enrich records for the APM UI's logs and errors views), it goes after the redaction, as in the traces pipeline.
+- No `elasticapm` processor in the logs pipeline. *Checked (task 5.1):* the EDOT standalone/gateway reference config page (`elastic.co/docs/reference/edot-collector/config/default-config-standalone`) says "While logs and metrics are exported verbatim into Elasticsearch, traces require two additional components", and its logs pipelines list no `elasticapm`.
 - No logs pipeline to Langfuse. Langfuse's OTLP endpoint accepts traces only.
 - The body is not redacted. The app's bodies are fixed strings, and the variable parts go in `extra`. Library bodies (such as `httpx`'s `HTTP Request: POST https://api.anthropic.com/... "HTTP/1.1 200 OK"`) carry no customer data. The verification search (section 9) is the check.
 

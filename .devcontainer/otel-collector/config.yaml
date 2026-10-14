@@ -4,8 +4,9 @@
 # Traces fan out from one OTLP receiver to two pipelines, over the compose
 # network: Langfuse (the LLM view) gets every span as the app sent it, with
 # conversation content; Elasticsearch (Kibana APM) gets them redacted, with no
-# content and the customer phone only as a salted hash. Logs and metrics
-# pipelines come later in phase 2 step B.
+# content and the customer phone only as a salted hash. Logs go to
+# Elasticsearch only (Langfuse takes traces), with the same redaction. The
+# metrics pipeline comes later in phase 2 step B.
 #
 # Components and config keys follow EDOT 9.5.5, which is built on Collector
 # core v0.161.0.
@@ -72,8 +73,7 @@ connectors:
   elasticapm: {}
 
 service:
-  # Traces only. Logs and metrics pipelines come with the app's logger and
-  # meter providers.
+  # Traces and logs. The metrics pipeline comes with the app's meter provider.
   pipelines:
     traces/langfuse:
       receivers: [otlp]
@@ -90,6 +90,30 @@ service:
       # content, or it could end up in derived fields or metrics.
       processors: [transform/redact, elasticapm]
       exporters: [elasticsearch/otel, elasticapm]
+
+    # TODO(human): logs go to Elasticsearch only, so Kibana can show an ERROR
+    # log next to its trace (same `trace_id`). Write the redaction processor
+    # and the `logs/elastic` pipeline (add-correlated-logs, design.md decision 8).
+    # Same denylist, salt and fail-closed mode as `transform/redact`, but in the
+    # `log` context: `log_statements` and `log.attributes[...]`, not `span`.
+    # No `elasticapm` here: logs are exported verbatim (EDOT docs). Sketch:
+    #
+    # processors:                       (top-level block, next to transform/redact)
+    #   transform/redact_logs:
+    #     error_mode: propagate
+    #     log_statements:
+    #       - delete_matching_keys(log.attributes, "^gen_ai\\.(...)$")
+    #       - set(log.attributes["fornada.customer.phone"], SHA256(Concat([...], ""))) where IsString(...)
+    #       - delete_key(log.attributes, "fornada.customer.phone") where ... not IsString(...)
+    #
+    # service.pipelines:
+    #   logs/elastic:
+    #     receivers: [otlp]
+    #     processors: [transform/redact_logs]
+    #     exporters: [elasticsearch/otel]
+    #
+    # Weigh: separate processor vs adding `log_statements` to `transform/redact`
+    # (decision 8). Then check: curl -s edot-collector:8888/metrics | grep log_records
 
     # APM metrics the connector builds from the redacted spans (latency,
     # throughput, error rate per service and transaction), for Kibana APM.
