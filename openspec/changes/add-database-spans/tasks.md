@@ -19,12 +19,12 @@ Which spans and attributes exist is core for phase 2 (AGENTS.md). Those choices 
 
 ## 3. Checkpointer path: conversation-state statements
 
-- [ ] 3.1 Write failing integration tests for `Checkpointer` (`tests/integration/`):
+- [x] 3.1 Write failing integration tests for `Checkpointer` (`tests/integration/`):
   - with an in-memory provider, `ensure_setup` followed by a put and a get of a checkpoint gives CLIENT spans whose `db.query.text` holds the checkpointer's SQL;
   - with no provider, the same calls give no span.
 
   Verify they fail.
-- [ ] 3.2 Give `Checkpointer` an optional `tracer_provider`. When it is set, pass the pool a `configure` callback that calls `PsycopgInstrumentor.instrument_connection(conn, tracer_provider=…)` (design.md, decision 2), with a comment on why it is not the global instrumentor. Verify the 3.1 tests pass, the existing `tests/unit/infrastructure/test_checkpointer.py` still passes, and `uv run task check` passes.
+- [x] 3.2 Give `Checkpointer` an optional `tracer_provider`. When it is set, pass the pool a `configure` callback that calls `PsycopgInstrumentor.instrument_connection(conn, tracer_provider=…)` (design.md, decision 2), with a comment on why it is not the global instrumentor. Verify the 3.1 tests pass, the existing `tests/unit/infrastructure/test_checkpointer.py` still passes, and `uv run task check` passes.
 
 ## 4. Lifespan wiring
 
