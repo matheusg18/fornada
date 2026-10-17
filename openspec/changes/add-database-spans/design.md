@@ -66,6 +66,7 @@ Neither instrumentation is given `capture_parameters`, which already defaults to
 - **[Pipelined statements understate their duration.]** In pipeline mode, `executemany` returns when the statements are queued, so the span ends before PostgreSQL answers. The wait then shows in the parent span, not in a database span. → Documented. The checkpointer's reads, which dominate a turn, are not pipelined.
 - **[Span volume.]** A turn gains about a dozen short spans in both backends, including Langfuse's LLM view. → Accepted for phase 3, which wants every detail. A filter in the Langfuse pipeline is a Collector change for later if it gets in the way.
 - **[Kibana APM may not map the stable `db.*` names.]** → Task 5.2 checks the span detail and the Dependencies view. Fallback: `database/dup` (Decision 3).
+- **[The SQLAlchemy instrumentor declares `sqlalchemy < 2.1.0`.]** The project uses 2.1.3, and outside its range the instrumentor instruments nothing. → `instrument()` is called with `skip_dep_check=True`, and the engine integration tests catch a break. Fallback: pin `sqlalchemy<2.1`.
 - **[Beta instrumentations (0.66b1).]** → Pinned in the lockfile next to the other 0.66b1 instrumentations. Imports go through `core/telemetry.py` and `infrastructure/checkpointer.py` only.
 - **[The SQLAlchemy instrumentor is a process-wide singleton.]** A second `instrument()` call is ignored with a warning. → Tests uninstrument in a fixture's teardown, and the app instruments once per lifespan, as it does with `httpx2`.
 

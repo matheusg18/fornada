@@ -4,18 +4,18 @@ Which spans and attributes exist is core for phase 2 (AGENTS.md). Those choices 
 
 ## 1. Dependencies
 
-- [ ] 1.1 Run `uv add --package fornada-api opentelemetry-instrumentation-sqlalchemy opentelemetry-instrumentation-psycopg`. Verify both are direct dependencies in `apps/api/pyproject.toml`, `uv.lock` resolves them at 0.66b1 (with `opentelemetry-instrumentation-dbapi`), and `uv tree --invert --package opentelemetry-instrumentation-sqlalchemy` now lists `fornada-api`.
+- [x] 1.1 Run `uv add --package fornada-api opentelemetry-instrumentation-sqlalchemy opentelemetry-instrumentation-psycopg`. Verify both are direct dependencies in `apps/api/pyproject.toml`, `uv.lock` resolves them at 0.66b1 (with `opentelemetry-instrumentation-dbapi`), and `uv tree --invert --package opentelemetry-instrumentation-sqlalchemy` now lists `fornada-api`.
 
 ## 2. Engine path: tool statements
 
-- [ ] 2.1 Make the database semconv opt-in reachable from tests. The opt-in is read once per process, by the first instrumentor that initializes, so the test session must set `OTEL_SEMCONV_STABILITY_OPT_IN` before any instrumentor runs (for example, in the root `tests/conftest.py`, from the same constant `setup_tracing` uses). Verify that a test asserting `db.query.text` sees the stable name whichever test file runs first (`pytest -p no:randomly` in both orders of the two test files).
-- [ ] 2.2 Write failing integration tests in `tests/integration/test_database_spans.py` (`app-tracing` delta). Use a fixture that instruments the app engine with an in-memory provider and uninstruments it at teardown:
+- [x] 2.1 Make the database semconv opt-in reachable from tests. The opt-in is read once per process, by the first instrumentor that initializes, so the test session must set `OTEL_SEMCONV_STABILITY_OPT_IN` before any instrumentor runs (for example, in the root `tests/conftest.py`, from the same constant `setup_tracing` uses). Verify that a test asserting `db.query.text` sees the stable name whichever test file runs first (`pytest -p no:randomly` in both orders of the two test files).
+- [x] 2.2 Write failing integration tests in `tests/integration/test_database_spans.py` (`app-tracing` delta). Use a fixture that instruments the app engine with an in-memory provider and uninstruments it at teardown:
   - a `select` gives one CLIENT span with `db.system.name` = `postgresql`, `db.namespace` = `fornada` and the statement in `db.query.text`;
   - an insert of `Maria Teste`, `+5581999991234` and a known address through the rollback sessionmaker leaves none of these values in any attribute of any span;
   - a duplicate-phone insert gives a span with status ERROR whose description has no `DETAIL:` line and no inserted value.
 
   Verify they fail.
-- [ ] 2.3 In `core/telemetry.py`, give `setup_tracing` the engine and instrument it with `SQLAlchemyInstrumentor` and the provider (design.md, decisions 1 and 4). Change the opt-in default to `http,database` (decision 3). Uninstrument it in `shutdown_tracing` before `provider.shutdown()`. Update the module docstring. Verify the 2.2 tests pass and `uv run task check` passes.
+- [x] 2.3 In `core/telemetry.py`, give `setup_tracing` the engine and instrument it with `SQLAlchemyInstrumentor` and the provider (design.md, decisions 1 and 4). Change the opt-in default to `http,database` (decision 3). Uninstrument it in `shutdown_tracing` before `provider.shutdown()`. Update the module docstring. Verify the 2.2 tests pass and `uv run task check` passes.
 
 ## 3. Checkpointer path: conversation-state statements
 

@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     try:
         # Global before the first request: FastAPI looks the provider up per
         # request. None when tracing is off.
-        tracer_provider = setup_tracing(settings.telemetry)
+        tracer_provider = setup_tracing(settings.telemetry, engine)
         await checkpointer.open()
         # Content only matters when spans are exported; with tracing off, skip
         # building it.

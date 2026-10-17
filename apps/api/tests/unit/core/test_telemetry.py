@@ -6,6 +6,7 @@ import pytest
 from opentelemetry import trace
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from fornada_api.core import telemetry
 from fornada_api.core.config import TelemetrySettings
@@ -46,7 +47,8 @@ def test_buffered_spans_are_exported_at_shutdown() -> None:
 
 def test_disabled_tracing_registers_nothing() -> None:
     before = trace.get_tracer_provider()
-    assert setup_tracing(TelemetrySettings(enabled=False)) is None
+    engine = create_async_engine("postgresql+psycopg://x@127.0.0.1:1/x")
+    assert setup_tracing(TelemetrySettings(enabled=False), engine) is None
     assert trace.get_tracer_provider() is before
 
 

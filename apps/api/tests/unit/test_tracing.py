@@ -84,7 +84,7 @@ def test_lifespan_sets_up_and_shuts_down_tracing(
     calls: list[tuple[str, object]] = []
     provider = object()
 
-    def fake_setup(settings: TelemetrySettings) -> object:
+    def fake_setup(settings: TelemetrySettings, engine: object) -> object:
         calls.append(("setup", settings))
         return provider
 
