@@ -4,8 +4,9 @@
 # Traces fan out from one OTLP receiver to two pipelines, over the compose
 # network: Langfuse (the LLM view) gets every span as the app sent it, with
 # conversation content; Elasticsearch (Kibana APM) gets them redacted, with no
-# content and the customer phone only as a salted hash. Logs and metrics
-# pipelines come later in phase 2 step B.
+# content and the customer phone only as a salted hash. Logs go to
+# Elasticsearch only (Langfuse takes traces), with the same redaction. The
+# metrics pipeline comes later in phase 2 step B.
 #
 # Components and config keys follow EDOT 9.5.5, which is built on Collector
 # core v0.161.0.
@@ -68,12 +69,24 @@ processors:
       # passed on (SHA256 would fail on it).
       - delete_key(span.attributes, "fornada.customer.phone") where span.attributes["fornada.customer.phone"] != nil and not IsString(span.attributes["fornada.customer.phone"])
 
+  # Same rules as `transform/redact`, for log records. The app puts none of
+  # these attributes on a log today; the statements keep the guarantee true per
+  # signal, so a future `extra={"fornada.customer.phone": ...}` is hashed
+  # without touching this file. Separate from `transform/redact` so each
+  # pipeline's error count points at its own statements. Message bodies are
+  # not touched: the app logs fixed strings and puts variable data in attributes.
+  transform/redact_logs:
+    error_mode: propagate
+    log_statements:
+      - delete_matching_keys(log.attributes, "^gen_ai\\.(input\\.messages|output\\.messages|system_instructions|tool\\.call\\.(arguments|result))$")
+      - set(log.attributes["fornada.customer.phone"], SHA256(Concat(["${env:PHONE_HASH_SALT}", log.attributes["fornada.customer.phone"]], ""))) where IsString(log.attributes["fornada.customer.phone"])
+      - delete_key(log.attributes, "fornada.customer.phone") where log.attributes["fornada.customer.phone"] != nil and not IsString(log.attributes["fornada.customer.phone"])
+
 connectors:
   elasticapm: {}
 
 service:
-  # Traces only. Logs and metrics pipelines come with the app's logger and
-  # meter providers.
+  # Traces and logs. The metrics pipeline comes with the app's meter provider.
   pipelines:
     traces/langfuse:
       receivers: [otlp]
@@ -90,6 +103,16 @@ service:
       # content, or it could end up in derived fields or metrics.
       processors: [transform/redact, elasticapm]
       exporters: [elasticsearch/otel, elasticapm]
+
+    # Logs go to Elasticsearch only (Langfuse takes traces). Same receiver,
+    # so the Collector hands this pipeline its own copy of each batch. No
+    # `elasticapm`: EDOT exports logs verbatim, only traces need it. The
+    # records keep `trace_id`/`span_id`, which is what joins a log to its trace
+    # in Kibana.
+    logs/elastic:
+      receivers: [otlp]
+      processors: [transform/redact_logs]
+      exporters: [elasticsearch/otel]
 
     # APM metrics the connector builds from the redacted spans (latency,
     # throughput, error rate per service and transaction), for Kibana APM.

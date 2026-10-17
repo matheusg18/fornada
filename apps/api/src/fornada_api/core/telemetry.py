@@ -1,5 +1,5 @@
-"""OpenTelemetry tracing for the API: build the trace pipeline, register it for
-the process and tear it down at shutdown.
+"""OpenTelemetry for the API: build the trace and log pipelines, register
+tracing for the process and tear both down at shutdown.
 
 `build_tracer_provider` has no global side effects, so tests can inject an
 in-memory exporter and read spans back. `setup_tracing` is what the lifespan
@@ -7,13 +7,20 @@ calls: it registers the provider globally, where FastAPI's native telemetry
 looks it up on every request, and instruments `httpx2`, the HTTP client under
 the Anthropic and OpenAI SDKs (plain `httpx` carries no request on a
 conversation turn, so it is not instrumented).
+
+`build_logger_provider` is not registered globally: `configure_logging` hands
+it to the OTLP log handler directly, so no other code can pick it up and tests
+need no process-wide state.
 """
 
 import os
 
 from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.httpx import HTTPX2ClientInstrumentor
+from opentelemetry.sdk._logs import LoggerProvider
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor, LogRecordExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter
@@ -30,6 +37,19 @@ def traces_url(settings: TelemetrySettings) -> str:
     return f"{settings.otlp_endpoint}/v1/traces"
 
 
+def logs_url(settings: TelemetrySettings) -> str:
+    return f"{settings.otlp_endpoint}/v1/logs"
+
+
+def build_resource() -> Resource:
+    # `service.name` only. The package version (0.1.0) does not change per
+    # commit, so `service.version` would not tell `v0` from later versions;
+    # the prompt version comes later as a span attribute. Attributes passed
+    # here win over OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES. Traces and
+    # logs share it, so Kibana joins them by service.
+    return Resource.create({"service.name": SERVICE_NAME})
+
+
 def build_tracer_provider(
     settings: TelemetrySettings, exporter: SpanExporter | None = None
 ) -> TracerProvider:
@@ -38,11 +58,7 @@ def build_tracer_provider(
     if exporter is None:
         exporter = OTLPSpanExporter(endpoint=traces_url(settings))
 
-    # `service.name` only. The package version (0.1.0) does not change per
-    # commit, so `service.version` would not tell `v0` from later versions;
-    # the prompt version comes later as a span attribute. Attributes passed
-    # here win over OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES.
-    resource = Resource.create({"service.name": SERVICE_NAME})
+    resource = build_resource()
 
     # Keep every span: phase 3 error analysis needs every conversation.
     # ParentBased still honors a caller's `traceparent` that dropped its trace.
@@ -50,6 +66,23 @@ def build_tracer_provider(
     # `provider.shutdown()` drains the queue.
     provider = TracerProvider(resource=resource, sampler=ParentBased(ALWAYS_ON))
     provider.add_span_processor(BatchSpanProcessor(exporter))
+    return provider
+
+
+def build_logger_provider(
+    settings: TelemetrySettings, exporter: LogRecordExporter | None = None
+) -> LoggerProvider:
+    """Build the log pipeline without registering it. `exporter` replaces the
+    OTLP exporter in tests."""
+    if exporter is None:
+        # An explicit `endpoint=` wins over OTEL_EXPORTER_OTLP_*, so no OTEL
+        # variable redirects the logs or adds a second exporter.
+        exporter = OTLPLogExporter(endpoint=logs_url(settings))
+
+    # Batch defaults: export every 1 s or 512 records, off the request path;
+    # `provider.shutdown()` drains the queue.
+    provider = LoggerProvider(resource=build_resource())
+    provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
     return provider
 
 
@@ -77,4 +110,9 @@ def setup_tracing(settings: TelemetrySettings) -> TracerProvider | None:
 def shutdown_tracing(provider: TracerProvider) -> None:
     """Stop creating spans, then export what is still buffered."""
     HTTPX2ClientInstrumentor().uninstrument()
+    provider.shutdown()
+
+
+def shutdown_logging(provider: LoggerProvider) -> None:
+    """Export the log records still buffered, then stop the log pipeline."""
     provider.shutdown()

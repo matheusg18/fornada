@@ -14,7 +14,12 @@ from fornada_api.agents.attendant.prompt import load_system_prompt
 from fornada_api.agents.attendant.tools import default_tools
 from fornada_api.core.config import get_settings
 from fornada_api.core.logging import configure_logging
-from fornada_api.core.telemetry import setup_tracing, shutdown_tracing
+from fornada_api.core.telemetry import (
+    build_logger_provider,
+    setup_tracing,
+    shutdown_logging,
+    shutdown_tracing,
+)
 from fornada_api.infrastructure.checkpointer import Checkpointer
 from fornada_api.infrastructure.engine import get_engine
 
@@ -25,7 +30,12 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # Invalid settings fail here, before any request is served.
     settings = get_settings()
-    configure_logging(settings.log)
+    # Telemetry on: logs also go to the Collector, each stamped with the active
+    # span's trace id. Building the provider does not connect.
+    logger_provider = (
+        build_logger_provider(settings.telemetry) if settings.telemetry.enabled else None
+    )
+    configure_logging(settings.log, logger_provider)
     engine = get_engine()
     prompt = load_system_prompt()
     checkpointer = Checkpointer(settings.db.url.get_secret_value())
@@ -62,6 +72,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         # span queue; with the Collector down it retries for a few seconds.
         if tracer_provider is not None:
             shutdown_tracing(tracer_provider)
+        # Logs after traces, so records written while tracing shuts down are
+        # still exported. Detach the OTLP handler first (stdout stays), so no
+        # record reaches a provider that has already stopped.
+        if logger_provider is not None:
+            configure_logging(settings.log)
+            shutdown_logging(logger_provider)
 
 
 # FastAPI's native OpenTelemetry emits the SERVER span per request through the
@@ -76,8 +92,10 @@ app = FastAPI(
         # one from OTEL_* variables and send every span twice. An explicit
         # value wins over FASTAPI_OTEL_AUTO_CONFIGURE.
         "auto_configure": False,
-        # Off until step B adds meter and logger providers. `logs` records
-        # exception messages and stack traces, which can carry customer text.
+        # `metrics` stays off until the meter provider exists. `logs` stays off
+        # on purpose: it records request validation failures, whose error
+        # detail echoes the invalid input (the customer's message). Unhandled
+        # errors are already logged by our own code, inside the request's span.
         "metrics": False,
         "logs": False,
     },
