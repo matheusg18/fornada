@@ -50,11 +50,14 @@ Which spans and attributes exist is core for phase 2 (AGENTS.md). Those choices 
 
 ## 5. End-to-end verification
 
-- [ ] 5.1 With the dev environment up and `TELEMETRY__ENABLED=true`, run `uv run task dev` and send a turn that makes the agent call `search_catalog` and then `create_order` with a known phone. Verify the following, and record the trace id here:
+- [x] 5.1 With the dev environment up and `TELEMETRY__ENABLED=true`, run `uv run task dev` and send a turn that makes the agent call `search_catalog` and then `create_order` with a known phone. Verify the following, and record the trace id here:
   - `curl -s edot-collector:8888/metrics | grep spans` shows no new `send_failed_spans`;
   - in Langfuse, the trace shows the database spans under the tool spans.
-- [ ] 5.2 In Kibana (Playwright MCP), open that trace in APM. Verify that the database spans show their statement and the PostgreSQL dependency appears. If APM does not read the stable `db.*` names, switch the default to `http,database/dup` (design.md, decision 3), rerun 5.1, and record the outcome here.
-- [ ] 5.3 In Kibana Dev Tools, run `GET traces-*/_search` with a `query_string` for the phone used in 5.1, and for the customer name. Verify that both return 0 hits.
+  - **Result:** trace `1bd05b505f5d7840d461b6c273a7f560`, a real turn that called `search_catalog` and then `create_order` (order #400), with telemetry on. The Collector shows no `send_failed_spans` series (no failures), and Elasticsearch and Langfuse each received 80 spans. In Langfuse (checked through the v2 observations API, since the v4 deployment has no traces endpoint), the `create_order` observation has the `connect` span and the `SELECT`/`INSERT`/`UPDATE` spans as children, and the checkpoint statements sit under `invoke_agent fornada-attendant`.
+- [x] 5.2 In Kibana (Playwright MCP), open that trace in APM. Verify that the database spans show their statement and the PostgreSQL dependency appears. If APM does not read the stable `db.*` names, switch the default to `http,database/dup` (design.md, decision 3), rerun 5.1, and record the outcome here.
+  - **Result:** no switch to `database/dup` needed. The trace's Elasticsearch documents have `span.type: db`, `span.subtype: postgresql`, `service.target.name: fornada` and the statement in `db.query.text`, and Kibana's APM dependencies API (not the Playwright UI) lists `postgresql` next to `api.anthropic.com:443`.
+- [x] 5.3 In Kibana Dev Tools, run `GET traces-*/_search` with a `query_string` for the phone used in 5.1, and for the customer name. Verify that both return 0 hits.
+  - **Result:** a `query_string` search on `traces-*,logs-*` for `5581988887777`, `88887777`, `Ana Verificação` and `Verificação` returned 0 hits each.
 
 ## Workflow follow-up
 
