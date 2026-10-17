@@ -38,12 +38,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     configure_logging(settings.log, logger_provider)
     engine = get_engine()
     prompt = load_system_prompt()
-    checkpointer = Checkpointer(settings.db.url.get_secret_value())
     tracer_provider = None
+    checkpointer = None
     try:
         # Global before the first request: FastAPI looks the provider up per
-        # request. None when tracing is off.
+        # request. None when tracing is off. Before the checkpointer, which
+        # needs the provider to trace its connections.
         tracer_provider = setup_tracing(settings.telemetry, engine)
+        checkpointer = Checkpointer(settings.db.url.get_secret_value(), tracer_provider)
         await checkpointer.open()
         # Content only matters when spans are exported; with tracing off, skip
         # building it.
@@ -66,7 +68,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         )
         yield
     finally:
-        await checkpointer.close()
+        if checkpointer is not None:
+            await checkpointer.close()
         await engine.dispose()
         # Last, so spans emitted while closing still get exported. Drains the
         # span queue; with the Collector down it retries for a few seconds.

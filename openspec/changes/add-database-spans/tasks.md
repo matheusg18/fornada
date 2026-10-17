@@ -28,20 +28,20 @@ Which spans and attributes exist is core for phase 2 (AGENTS.md). Those choices 
 
 ## 4. Lifespan wiring
 
-- [ ] 4.1 Write failing tests in `tests/unit/test_tracing.py`, following its spy pattern:
+- [x] 4.1 Write failing tests in `tests/unit/test_tracing.py`, following its spy pattern:
   - with telemetry off, the lifespan leaves `SQLAlchemyInstrumentor().is_instrumented_by_opentelemetry` false and builds the `Checkpointer` with no provider;
   - with telemetry on, the engine is instrumented and the `Checkpointer` gets the provider `setup_tracing` returned;
   - at shutdown, SQLAlchemy is uninstrumented.
 
   Verify they fail.
-- [ ] 4.2 Wire `main.py`: call `setup_tracing(settings.telemetry, engine)` before building the `Checkpointer`, and pass it the provider (design.md, decision 4). Verify the 4.1 tests pass and `uv run task check` passes.
-- [ ] 4.3 Write an integration test that runs one graph turn with the scripted chat model calling `search_catalog`, against the real database and a real checkpointer, with an in-memory provider (`app-tracing` delta):
+- [x] 4.2 Wire `main.py`: call `setup_tracing(settings.telemetry, engine)` before building the `Checkpointer`, and pass it the provider (design.md, decision 4). Verify the 4.1 tests pass and `uv run task check` passes.
+- [x] 4.3 Write an integration test that runs one graph turn with the scripted chat model calling `search_catalog`, against the real database and a real checkpointer, with an in-memory provider (`app-tracing` delta):
   - the tool's statements are CLIENT spans whose ancestor is the `execute_tool search_catalog` span;
   - checkpoint statements are in the same trace;
-  - no `db.query.text` appears twice for the same execution, that is, no CLIENT database span has another database span as its parent.
+  - no `db.query.text` appears twice for the same execution, that is, no two database spans with the same `db.query.text` overlap in time (a second instrumentation of one statement is a sibling span running inside the first, not its child).
 
   Verify it passes, and fails if the global `PsycopgInstrumentor().instrument()` is called instead (try it, then revert).
-- [ ] 4.4 Document in `AGENTS.md`, in the Logs and redaction paragraphs:
+- [x] 4.4 Document in `AGENTS.md`, in the Logs and redaction paragraphs:
   - a turn's trace now has database spans, from the tools (under `execute_tool …`) and from the checkpointer;
   - `db.query.text` carries placeholders only;
   - the checkpointer path's errors keep PostgreSQL's `DETAIL:` line in the span's status and exception event, an extension of the phase 6 known gap (design.md, Risks).
