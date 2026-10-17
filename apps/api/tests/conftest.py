@@ -2,11 +2,19 @@
 set only once per process, so span tests share one in-memory exporter for the
 session."""
 
+import os
+
 import pytest
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+from fornada_api.core.telemetry import SEMCONV_OPT_IN
+
+# Read once per process, by the first instrumentor that initializes, so it must
+# be set before any test instruments anything; the app sets the same value.
+os.environ.setdefault("OTEL_SEMCONV_STABILITY_OPT_IN", SEMCONV_OPT_IN)
 
 
 @pytest.fixture(scope="session")

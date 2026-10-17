@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from opentelemetry import trace
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import SpanKind
 
@@ -20,7 +21,13 @@ from fornada_api.agents.attendant.attendant import GraphAttendant
 from fornada_api.agents.attendant.graph import build_graph
 from fornada_api.agents.attendant.prompt import load_system_prompt
 from fornada_api.core.config import TelemetrySettings, get_settings
+from fornada_api.core.telemetry import (
+    build_tracer_provider,
+    instrument_engine,
+    shutdown_tracing,
+)
 from fornada_api.dependencies import get_attendant
+from fornada_api.infrastructure.checkpointer import Checkpointer
 from fornada_api.infrastructure.engine import get_engine, get_sessionmaker
 from fornada_api.main import app
 from tests.unit.agents.fakes import ScriptedChatModel
@@ -84,7 +91,7 @@ def test_lifespan_sets_up_and_shuts_down_tracing(
     calls: list[tuple[str, object]] = []
     provider = object()
 
-    def fake_setup(settings: TelemetrySettings) -> object:
+    def fake_setup(settings: TelemetrySettings, engine: object) -> object:
         calls.append(("setup", settings))
         return provider
 
@@ -97,6 +104,56 @@ def test_lifespan_sets_up_and_shuts_down_tracing(
     with TestClient(app):
         assert calls == [("setup", get_settings().telemetry)]
     assert calls[-1] == ("shutdown", provider)
+
+
+def spy_checkpointer(monkeypatch: pytest.MonkeyPatch) -> list[object]:
+    """Record the tracer provider the lifespan hands the `Checkpointer`."""
+    seen: list[object] = []
+
+    def build(url: str, tracer_provider: Any = None) -> Checkpointer:
+        seen.append(tracer_provider)
+        return Checkpointer(url, tracer_provider)
+
+    monkeypatch.setattr(main_module, "Checkpointer", build)
+    return seen
+
+
+def test_tracing_off_instruments_no_database_path(
+    app_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen = spy_checkpointer(monkeypatch)
+    with TestClient(app):
+        assert not SQLAlchemyInstrumentor().is_instrumented_by_opentelemetry
+    assert seen == [None]
+
+
+def test_tracing_on_instruments_the_engine_and_traces_the_checkpointer(
+    app_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen = spy_checkpointer(monkeypatch)
+    provider = object()
+    engines: list[object] = []
+
+    def fake_setup(settings: TelemetrySettings, engine: object) -> object:
+        engines.append(engine)
+        return provider
+
+    monkeypatch.setattr(main_module, "setup_tracing", fake_setup)
+    monkeypatch.setattr(main_module, "shutdown_tracing", lambda p: None)
+
+    with TestClient(app):
+        assert engines == [get_engine()]
+    assert seen == [provider]
+
+
+def test_shutdown_uninstruments_the_engine(app_env: None) -> None:
+    provider = build_tracer_provider(TelemetrySettings(enabled=True), InMemorySpanExporter())
+    instrument_engine(get_engine(), provider)
+    assert SQLAlchemyInstrumentor().is_instrumented_by_opentelemetry
+
+    shutdown_tracing(provider)
+
+    assert not SQLAlchemyInstrumentor().is_instrumented_by_opentelemetry
 
 
 def test_disabled_tracing_leaves_the_global_provider(app_env: None) -> None:

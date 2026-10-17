@@ -88,7 +88,7 @@ def telemetry_on(
 
     monkeypatch.setattr(main_module, "build_logger_provider", fake_build)
     monkeypatch.setattr(main_module, "shutdown_logging", fake_shutdown_logging)
-    monkeypatch.setattr(main_module, "setup_tracing", lambda settings: object())
+    monkeypatch.setattr(main_module, "setup_tracing", lambda settings, engine: object())
     monkeypatch.setattr(
         main_module,
         "shutdown_tracing",
