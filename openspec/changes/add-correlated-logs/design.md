@@ -132,6 +132,7 @@ transform/redact_logs:
 
 ## Risks / Trade-offs
 
+- [Span events are not redacted. `transform/redact` and `transform/redact_logs` act on attributes only, so an `exception` event's `exception.message` and `exception.stacktrace` reach Elasticsearch whole, and `elasticapm` turns each one into an error document in `logs-generic.otel-default` (observed in task 6.3)] → Out of scope here: today's exceptions carry provider errors, and database errors lose their bound values and `DETAIL:` line (decision 7). Recorded as a known gap in AGENTS.md for phase 6 (Presidio before Elasticsearch, or `span_event` statements in the Collector).
 - [`opentelemetry-instrumentation-logging` is beta (0.66b1), and the logs SDK is still `_logs`, so it is not stable] → Pinned in the lockfile, like the other `0.66b1` instrumentations. The import goes through one module (`core/telemetry.py`).
 - [Non-primitive `extra` values (`Decimal`, `datetime`, `UUID`) are not valid OTel attribute values; the SDK drops them with a warning] → The app's current extras are `str` and `int`, and `conversation_id` is already logged as `str(...)`. The stdout line keeps the string form as before. If an extra disappears in Kibana, convert it at the call site.
 - [Exception messages from the LLM provider SDKs could carry content] → `add-agent-spans` judged provider errors free of customer text. The section 9 search over `logs-*` is the check, and a hit becomes an OTTL statement on `exception.*` here.
