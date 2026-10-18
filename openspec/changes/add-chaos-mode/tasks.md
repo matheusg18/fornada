@@ -7,8 +7,8 @@
 
 ## 2. Chaos engine
 
-- [ ] 2.1 Create `infrastructure/chaos.py` with `Chaos` (`delay_ms`, `capacity_fails`, `price_factor`, `mark_quoted`, built from `ChaosSettings`); unit tests cover delays within range and zero range, rate 0 and 1, factor `1` before a mark and `1.10` after, no compounding, independent conversations, and identical draw sequences for the same seed; verify with `uv run task test:unit`
-- [ ] 2.2 Add `fornada.chaos.enabled`, `fornada.chaos.delay_ms` and `fornada.chaos.fault` (with the `capacity_unavailable` and `price_increase` values) to `agents/attendant/tracing.py`
+- [x] 2.1 Create `infrastructure/chaos.py` with `Chaos` (`delay_ms`, `capacity_fails`, `price_factor`, `mark_quoted`, built from `ChaosSettings`); unit tests cover delays within range and zero range, rate 0 and 1, factor `1` before a mark and `1.10` after, no compounding, independent conversations, and identical draw sequences for the same seed; verify with `uv run task test:unit`
+- [x] 2.2 Add `fornada.chaos.enabled`, `fornada.chaos.delay_ms` and `fornada.chaos.fault` (with the `capacity_unavailable` and `price_increase` values) to `agents/attendant/tracing.py`
 
 ## 3. Price factor in quotes
 
