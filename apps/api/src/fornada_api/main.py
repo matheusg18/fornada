@@ -16,8 +16,10 @@ from fornada_api.core.config import get_settings
 from fornada_api.core.logging import configure_logging
 from fornada_api.core.telemetry import (
     build_logger_provider,
+    setup_metrics,
     setup_tracing,
     shutdown_logging,
+    shutdown_metrics,
     shutdown_tracing,
 )
 from fornada_api.infrastructure.checkpointer import Checkpointer
@@ -39,8 +41,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     engine = get_engine()
     prompt = load_system_prompt()
     tracer_provider = None
+    meter_provider = None
     checkpointer = None
     try:
+        # Global before the graph runs: the agent's instruments resolve through
+        # it. None when telemetry is off.
+        meter_provider = setup_metrics(settings.telemetry)
         # Global before the first request: FastAPI looks the provider up per
         # request. None when tracing is off. Before the checkpointer, which
         # needs the provider to trace its connections.
@@ -89,6 +95,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         # span queue; with the Collector down it retries for a few seconds.
         if tracer_provider is not None:
             shutdown_tracing(tracer_provider)
+        # Exports what was recorded since the last 10 s export. Before logs, so
+        # a warning about a failed final export still goes out.
+        if meter_provider is not None:
+            shutdown_metrics(meter_provider)
         # Logs after traces, so records written while tracing shuts down are
         # still exported. Detach the OTLP handler first (stdout stays), so no
         # record reaches a provider that has already stopped.
@@ -109,10 +119,12 @@ app = FastAPI(
         # one from OTEL_* variables and send every span twice. An explicit
         # value wins over FASTAPI_OTEL_AUTO_CONFIGURE.
         "auto_configure": False,
-        # `metrics` stays off until the meter provider exists. `logs` stays off
-        # on purpose: it records request validation failures, whose error
-        # detail echoes the invalid input (the customer's message). Unhandled
-        # errors are already logged by our own code, inside the request's span.
+        # `metrics` stays off: HTTP server metrics are out of scope (the agent's
+        # own metrics cover turn latency); turning them on adds series per route
+        # and status code. `logs` stays off on purpose: it records request
+        # validation failures, whose error detail echoes the invalid input (the
+        # customer's message). Unhandled errors are already logged by our own
+        # code, inside the request's span.
         "metrics": False,
         "logs": False,
     },
