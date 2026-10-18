@@ -16,7 +16,7 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     import os
 
     for name in list(os.environ):
-        if name.upper().startswith(("LLM__", "APP__", "LOG__", "DB__", "TELEMETRY__")):
+        if name.upper().startswith(("LLM__", "APP__", "LOG__", "DB__", "TELEMETRY__", "CHAOS__")):
             monkeypatch.delenv(name)
 
 
@@ -284,6 +284,93 @@ def test_otlp_endpoint_trailing_slash_is_dropped(
 def test_invalid_otlp_endpoint(value: str, with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TELEMETRY__OTLP_ENDPOINT", value)
     with pytest.raises(ConfigError, match="TELEMETRY__OTLP_ENDPOINT"):
+        load()
+
+
+# --- chaos -------------------------------------------------------------------
+
+
+def test_chaos_off_by_default(with_key: None) -> None:
+    assert load().chaos.enabled is False
+
+
+def test_chaos_on(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CHAOS__ENABLED", "true")
+    assert load().chaos.enabled is True
+
+
+def test_invalid_chaos_switch(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CHAOS__ENABLED", "maybe")
+    with pytest.raises(ConfigError, match="CHAOS__ENABLED"):
+        load()
+
+
+def test_default_chaos_latency(with_key: None) -> None:
+    chaos = load().chaos
+    assert (chaos.latency_min_ms, chaos.latency_max_ms) == (200, 2000)
+
+
+@pytest.mark.parametrize("name", ["CHAOS__LATENCY_MIN_MS", "CHAOS__LATENCY_MAX_MS"])
+def test_negative_chaos_latency(name: str, with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(name, "-1")
+    with pytest.raises(ConfigError, match=name):
+        load()
+
+
+def test_chaos_latency_min_above_max(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CHAOS__LATENCY_MIN_MS", "3000")
+    monkeypatch.setenv("CHAOS__LATENCY_MAX_MS", "2000")
+    with pytest.raises(ConfigError, match="CHAOS__LATENCY_MIN_MS"):
+        load()
+
+
+def test_chaos_zero_latency_range(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CHAOS__LATENCY_MIN_MS", "0")
+    monkeypatch.setenv("CHAOS__LATENCY_MAX_MS", "0")
+    chaos = load().chaos
+    assert (chaos.latency_min_ms, chaos.latency_max_ms) == (0, 0)
+
+
+def test_default_chaos_failure_rate(with_key: None) -> None:
+    assert load().chaos.capacity_failure_rate == 0.1
+
+
+@pytest.mark.parametrize("value", ["1.5", "-0.1", "often"])
+def test_invalid_chaos_failure_rate(
+    value: str, with_key: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CHAOS__CAPACITY_FAILURE_RATE", value)
+    with pytest.raises(ConfigError, match="CHAOS__CAPACITY_FAILURE_RATE"):
+        load()
+
+
+def test_default_chaos_price_increase(with_key: None) -> None:
+    increase = load().chaos.price_increase_pct
+    assert isinstance(increase, Decimal)
+    assert increase == Decimal("10")
+
+
+@pytest.mark.parametrize("value", ["0", "-5", "100.5"])
+def test_invalid_chaos_price_increase(
+    value: str, with_key: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CHAOS__PRICE_INCREASE_PCT", value)
+    with pytest.raises(ConfigError, match="CHAOS__PRICE_INCREASE_PCT"):
+        load()
+
+
+def test_chaos_has_no_seed_by_default(with_key: None) -> None:
+    assert load().chaos.seed is None
+
+
+def test_chaos_seed(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CHAOS__SEED", "42")
+    assert load().chaos.seed == 42
+
+
+def test_invalid_chaos_seed(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CHAOS__SEED", "abc")
+    with pytest.raises(ConfigError, match="CHAOS__SEED"):
         load()
 
 

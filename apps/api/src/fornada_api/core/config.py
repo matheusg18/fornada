@@ -107,6 +107,27 @@ class TelemetrySettings(BaseModel):
         return url.rstrip("/")
 
 
+class ChaosSettings(BaseModel):
+    # Fault injection for simulator runs (random tool latency, `check_capacity`
+    # outages, a price rise after a conversation's first quote). Off by default;
+    # the other fields are validated even while it is off.
+    enabled: bool = False
+    latency_min_ms: int = Field(default=200, ge=0)
+    latency_max_ms: int = Field(default=2000, ge=0)
+    capacity_failure_rate: float = Field(default=0.1, ge=0, le=1)
+    price_increase_pct: Decimal = Field(default=Decimal("10"), gt=0, le=100)
+    seed: int | None = None
+
+    @model_validator(mode="after")
+    def _latency_range(self) -> Self:
+        if self.latency_min_ms > self.latency_max_ms:
+            raise ValueError(
+                f"CHAOS__LATENCY_MIN_MS ({self.latency_min_ms}) must not exceed "
+                f"CHAOS__LATENCY_MAX_MS ({self.latency_max_ms})"
+            )
+        return self
+
+
 class ConfigError(ValueError):
     """Settings failed validation. The message names environment variables."""
 
@@ -125,6 +146,7 @@ class Settings(BaseSettings):
     log: LogSettings = LogSettings()
     db: DbSettings
     telemetry: TelemetrySettings = TelemetrySettings()
+    chaos: ChaosSettings = ChaosSettings()
 
     @model_validator(mode="before")
     @classmethod

@@ -2,8 +2,8 @@
 
 ## 1. Settings
 
-- [ ] 1.1 Add `ChaosSettings` (`enabled`, `latency_min_ms`, `latency_max_ms`, `capacity_failure_rate`, `price_increase_pct`, `seed`) under `Settings.chaos` in `core/config.py`, with the bounds and the min ≤ max validator from the `app-config` delta; add unit tests in `tests/unit/core/test_config.py` for every scenario of the five new requirements and verify with `uv run task test:unit`
-- [ ] 1.2 Add the `CHAOS__*` block to the root `.env.example`, off and with defaults, and verify every `ChaosSettings` field is listed
+- [x] 1.1 Add `ChaosSettings` (`enabled`, `latency_min_ms`, `latency_max_ms`, `capacity_failure_rate`, `price_increase_pct`, `seed`) under `Settings.chaos` in `core/config.py`, with the bounds and the min ≤ max validator from the `app-config` delta; add unit tests in `tests/unit/core/test_config.py` for every scenario of the five new requirements and verify with `uv run task test:unit`
+- [x] 1.2 Add the `CHAOS__*` block to the root `.env.example`, off and with defaults, and verify every `ChaosSettings` field is listed
 
 ## 2. Chaos engine
 
