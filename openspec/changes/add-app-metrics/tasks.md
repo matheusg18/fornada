@@ -1,0 +1,45 @@
+# Tasks
+
+Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: the provider setup, which instruments and attributes exist, the Collector pipelines). The agent leaves the marker with the commented sketch from design.md, keeps the related tests failing, then stops and waits for the maintainer. Recording calls next to existing spans, settings, the simulator baggage, compose and the dashboard are periphery. Run `uv run task check` from the app's directory at the end of each app group.
+
+## 1. Price settings
+
+- [ ] 1.1 Look up the current published input and output prices per million tokens for `claude-haiku-4-5` and `gpt-5-mini` (use the `claude-api` skill for Anthropic and OpenAI's pricing page; never from memory). Note the source and date for the code comment.
+- [ ] 1.2 Write failing tests in `tests/unit/core/test_config.py` for the `app-config` delta: overrides, defaults, a negative price naming `LLM__OPENAI__OUTPUT_USD_PER_MTOK`, and that `TELEMETRY__ENABLED` is documented as switching metrics too. Verify they fail.
+- [ ] 1.3 Add `input_usd_per_mtok` and `output_usd_per_mtok` (`Decimal`, `ge=0`) to `ProviderSettings` with per-provider defaults from 1.1 and a dated comment. Update the root `.env.example` (prices, and that telemetry now includes metrics). Verify 1.2 passes and `uv run task check` passes.
+
+## 2. Meter provider
+
+- [ ] 2.1 Write failing tests in `tests/unit/core/test_telemetry.py`: `build_meter_provider` with an injected `InMemoryMetricReader` exports with `service.name=fornada-api`; the real exporter targets `{TELEMETRY__OTLP_ENDPOINT}/v1/metrics` even with `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` set; counters and histograms come out with delta temporality; the export interval is 10 s; `shutdown_metrics` exports what was recorded since the last export. Verify they fail.
+- [ ] 2.2 `TODO(human)`: in `core/telemetry.py`, leave the marker with the commented sketch of `metrics_url`, `build_meter_provider` (reader, delta temporality map, interval), `setup_metrics` and `shutdown_metrics` (design.md, decision 1). Stop and wait for the maintainer; then verify 2.1 passes.
+- [ ] 2.3 Wire `main.py`: with telemetry on, `setup_metrics` before tracing; at shutdown, `shutdown_metrics` after tracing and before logging, so records written during metric shutdown still export. Leave FastAPI's `metrics` telemetry option off and update its comment (metrics now exist; HTTP metrics stay out of scope). Add a lifespan test next to `test_tracing.py`: telemetry off builds no meter provider; on, the provider is shut down in that order. Verify `uv run task check` passes.
+
+## 3. Instruments and recording
+
+- [ ] 3.1 Write failing tests in `tests/unit/agents/` (in-memory reader, fake chat model and tools as in the existing span tests), one per `app-metrics` scenario: model call duration, tokens and cost (success and failure); turn duration (success and `GraphRecursionError`); tool duration and `fornada.tool.calls` (success, `tool_error` from a chaos outage, full day with no `error.type`); three turns count one conversation, and a failed first turn counts on the retry; persona `pechincheira`, unknown value → `other`, no baggage → `none`; with content capture on, no data point attribute outside the allowed list; durations within 10 ms of their spans. Verify they fail.
+- [ ] 3.2 `TODO(human)`: create `agents/attendant/metrics.py` with the marker and a commented sketch of the instrument definitions from design.md, decision 2 (names, kinds, units, semconv bucket boundaries via `explicit_bucket_boundaries_advisory`, the meter from the global proxy). The agent writes, outside the marker, the attribute constants it shares with `tracing.py`, the persona allowlist and the `ContextVar` for the turn's persona. Stop and wait.
+- [ ] 3.3 Record the measurements in `nodes.py` (`call_model`, `wrap_tool_call`) and `attendant.py` (`GraphAttendant.reply`) in the same branches that set the span status and `error.type`, timing with `time.perf_counter()` around the same awaited call. Compute cost from the active provider's prices (passed in when the graph is built). Count a conversation when the final state holds exactly one `HumanMessage`. Pass the request model to `GraphAttendant` from `main.py`. Log a WARNING at startup when the active model is not the default and its prices are defaults (`app-config` delta). Verify 3.1 passes and `uv run task check` passes.
+
+## 4. Persona through baggage
+
+- [ ] 4.1 Write failing API tests: a request through the real app with header `baggage: fornada.simulator.persona.id=apressada` gives `apressada` on the turn's measurements; the HTTP request to the model provider (httpx2 mock transport) has no `baggage` header; no exported span carries `fornada.simulator.persona.id`. Verify they fail.
+- [ ] 4.2 In `GraphAttendant.reply`, read the baggage entry, map it through the allowlist into the `ContextVar`, and attach a context with the baggage cleared for the rest of the turn (design.md, decision 6). Verify 4.1 passes and `uv run task check` passes.
+- [ ] 4.3 Write failing simulator tests in `apps/simulator/tests/unit/test_client.py` (`client-tracing` delta): with tracing on, the post carries `baggage` with only `fornada.simulator.persona.id=<id>`; no run id in it; with tracing off, no `baggage` header. Add a test that the simulator's persona ids equal the API's allowlist (both packages are in the workspace venv; if pyright rejects the cross-package import, compare against a list read from the API module's source and say so). Verify they fail.
+- [ ] 4.4 In the simulator's `send_message`, when tracing is enabled, attach a context with the persona baggage around the post so `propagate.inject` writes it. Update the module docstring. Verify 4.3 passes and `uv run task check` passes from `apps/simulator`. Confirm the chat's tests still pass unchanged.
+
+## 5. Collector metrics pipeline
+
+- [ ] 5.1 `TODO(human)`: in `.devcontainer/otel-collector/config.yaml`, leave the marker with the commented sketch of `transform/metrics_guard` and the `metrics/elastic` pipeline (design.md, decision 7), and update the header comment that says the metrics pipeline comes later. Stop and wait. Then the maintainer restarts the Collector on the host.
+- [ ] 5.2 Verify from `dev`: with the API on and telemetry enabled, one turn makes `otelcol_receiver_accepted_metric_points` and `otelcol_exporter_sent_metric_points` for `elasticsearch/otel` grow with no failed points; in Kibana Dev Tools, `GET metrics-*/_search` with `service.name: fornada-api` shows `gen_ai.invoke_agent.duration` as a histogram and no attribute outside the allowlist; the Collector log has no "dropping cumulative temporality" warning. Record the field paths the exporter used for metrics and attributes.
+
+## 6. Kibana dashboard
+
+- [ ] 6.1 Run a simulator batch (5 personas × 2 runs) with `CHAOS__ENABLED=true` and telemetry on, so every panel has data, including `check_capacity` errors.
+- [ ] 6.2 Build the dashboard in Kibana with the panels and controls of design.md, decision 8, using the field paths from 5.2 (fallback to ES|QL for p95 if Lens rejects the histogram field). Export the dashboard with its data view to `.devcontainer/kibana/fornada-metrics.ndjson` (`POST /api/saved_objects/_export` with `includeReferencesDeep`).
+- [ ] 6.3 Add the `kibana-setup` one-shot service to `.devcontainer/compose.yaml` (Elasticsearch image for curl, `restart: "no"`, `depends_on: kibana: service_healthy`, import with `overwrite=true` as `elastic`, the NDJSON mounted read-only). The maintainer rebuilds on the host; verify the dashboard appears after deleting it from Kibana and restarting, with no duplicate.
+
+## 7. Done check and docs
+
+- [ ] 7.1 With the batch from 6.1, verify the `kibana-dashboards` scenarios: cost per conversation shown in US$; p95 rises during the chaos batch; `check_capacity` has a non-zero error rate and the other tools zero; filtering to `pechincheira` changes every panel. Compare the batch's Kibana cost sum with Langfuse's cost for the same sessions, and note the difference.
+- [ ] 7.2 Update `AGENTS.md`: the Collector's metrics pipeline and guard, how to check metric delivery (`grep metric_points`), the dashboard and `kibana-setup`, the persona baggage and where it stops, and the price settings.
+- [ ] 7.3 Run `uv run task check` in `apps/api` and `apps/simulator`, and `npx -y @fission-ai/openspec@1.14.1 validate add-app-metrics --strict`.
