@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fornada_api import conversations, health
 from fornada_api.agents.attendant.attendant import GraphAttendant
 from fornada_api.agents.attendant.graph import build_graph
+from fornada_api.agents.attendant.metrics import TokenPrices
 from fornada_api.agents.attendant.model import build_chat_model
 from fornada_api.agents.attendant.prompt import load_system_prompt
 from fornada_api.agents.attendant.tools import default_tools
@@ -56,14 +57,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         # Content only matters when spans are exported; with tracing off, skip
         # building it.
         capture = settings.telemetry.enabled and settings.telemetry.capture_content
+        llm = settings.llm.active
+        prices = TokenPrices(llm.input_usd_per_mtok, llm.output_usd_per_mtok)
         graph = build_graph(
-            build_chat_model(settings.llm), default_tools(), prompt, capture_content=capture
+            build_chat_model(settings.llm),
+            default_tools(),
+            prompt,
+            capture_content=capture,
+            prices=prices,
         )
         app.state.attendant = GraphAttendant(
             graph.compile(checkpointer=checkpointer.saver),
             before_turn=checkpointer.ensure_setup,
             capture_content=capture,
             chaos_enabled=settings.chaos.enabled,
+            request_model=llm.model,
         )
         logger.info(
             "fornada-api starting",
@@ -73,6 +81,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
                 "prompt_version": prompt.version,
             },
         )
+        if not llm.prices_match_model:
+            # The model changed but its prices did not: the cost metric is off.
+            logger.warning(
+                "token prices are the default model's",
+                extra={"llm_model": llm.model, "llm_provider": settings.llm.provider},
+            )
         if settings.chaos.enabled:
             chaos = settings.chaos
             # Faults are on in every conversation; say so loudly at startup.

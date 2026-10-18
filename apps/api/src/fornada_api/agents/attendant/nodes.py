@@ -1,6 +1,7 @@
 """The graph's model node, and the wrapper around each call of LangGraph's
 prebuilt `ToolNode`."""
 
+import time
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
@@ -12,7 +13,7 @@ from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command
 from opentelemetry.trace import Span, SpanKind, StatusCode
 
-from fornada_api.agents.attendant import span_content, tracing
+from fornada_api.agents.attendant import metrics, span_content, tracing
 from fornada_api.agents.attendant.prompt import SystemPrompt
 from fornada_api.agents.attendant.state import AttendantState
 from fornada_api.services.errors import InvalidPhone
@@ -26,13 +27,15 @@ def make_call_model(
     tools: Sequence[BaseTool],
     prompt: SystemPrompt,
     capture_content: bool = False,
+    prices: metrics.TokenPrices | None = None,
 ):
     """The model node, with `tools` bound to `model` once, when the graph is built.
 
     The system prompt goes first in every call and is never returned, so it is
     not saved in the conversation. The answer records the prompt version.
     With `capture_content`, the `chat` span also carries what was sent and
-    what came back.
+    what came back. With `prices`, each call that returns usage adds its cost
+    to `fornada.gen_ai.cost`.
     """
     model_with_tools = model.bind_tools(list(tools))
     # Read once, when the graph is built: `ChatAnthropic` and `ChatOpenAI` give
@@ -73,6 +76,15 @@ def make_call_model(
             # Same reason as the turn span: no exception message in the status.
             set_status_on_exception=False,
         ) as span:
+            # Same dimensions as the span, minus ids and content, plus the persona.
+            measured = {
+                tracing.GEN_AI_OPERATION_NAME: tracing.OP_CHAT,
+                tracing.GEN_AI_PROVIDER_NAME: provider,
+                tracing.GEN_AI_REQUEST_MODEL: request_model,
+                metrics.FORNADA_SIMULATOR_PERSONA_ID: metrics.current_persona.get(),
+            }
+            measured = {k: v for k, v in measured.items() if v is not None}
+            start = time.perf_counter()
             try:
                 answer = await model_with_tools.ainvoke(
                     [SystemMessage(prompt.text), *state["messages"]]
@@ -80,7 +92,12 @@ def make_call_model(
             except Exception as error:
                 span.set_status(StatusCode.ERROR)
                 span.set_attribute(tracing.ERROR_TYPE, type(error).__name__)
+                record_failed_call(
+                    time.perf_counter() - start,
+                    {**measured, tracing.ERROR_TYPE: type(error).__name__},
+                )
                 raise
+            record_call(time.perf_counter() - start, measured, answer, prices)
             set_response_attributes(span, answer)
             if capture_content and isinstance(answer, AIMessage):
                 span.set_attribute(
@@ -116,6 +133,47 @@ def set_response_attributes(span: Span, answer: BaseMessage) -> None:
         # semconv asks; no cache attributes (design.md, decision 6).
         span.set_attribute(tracing.GEN_AI_USAGE_INPUT_TOKENS, usage["input_tokens"])
         span.set_attribute(tracing.GEN_AI_USAGE_OUTPUT_TOKENS, usage["output_tokens"])
+
+
+COST_DIMENSIONS = (
+    tracing.GEN_AI_PROVIDER_NAME,
+    tracing.GEN_AI_REQUEST_MODEL,
+    metrics.FORNADA_SIMULATOR_PERSONA_ID,
+)
+
+
+def record_failed_call(seconds: float, attributes: dict[str, Any]) -> None:
+    """A call with no response: its duration, and 0 tokens (semconv). No cost:
+    nothing was billed that the app can know of."""
+    metrics.inference_duration.record(seconds, attributes)
+    metrics.inference_input_tokens.record(0, attributes)
+    metrics.inference_output_tokens.record(0, attributes)
+
+
+def record_call(
+    seconds: float,
+    attributes: dict[str, Any],
+    answer: BaseMessage,
+    prices: metrics.TokenPrices | None,
+) -> None:
+    """A call that answered: duration, and tokens and cost when the provider
+    reported usage. A call without usage records no tokens (`app-metrics` spec)."""
+    if response_model := answer.response_metadata.get("model_name"):
+        attributes = {**attributes, tracing.GEN_AI_RESPONSE_MODEL: response_model}
+    metrics.inference_duration.record(seconds, attributes)
+
+    usage = answer.usage_metadata if isinstance(answer, AIMessage) else None
+    if usage is None:
+        return
+    metrics.inference_input_tokens.record(usage["input_tokens"], attributes)
+    metrics.inference_output_tokens.record(usage["output_tokens"], attributes)
+    if prices is not None:
+        # Per provider and requested model: the response model is a dated
+        # snapshot billed at the same price.
+        metrics.cost.add(
+            prices.cost(usage["input_tokens"], usage["output_tokens"]),
+            {k: v for k, v in attributes.items() if k in COST_DIMENSIONS},
+        )
 
 
 ToolHandler = Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]]
@@ -164,6 +222,8 @@ def make_wrap_tool_call(capture_content: bool = False):
             attributes=attributes,
             set_status_on_exception=False,
         ) as span:
+            persona = metrics.current_persona.get()
+            start = time.perf_counter()
             try:
                 result = await handler(request)
             except Exception as error:
@@ -171,18 +231,45 @@ def make_wrap_tool_call(capture_content: bool = False):
                 # else still reaches here and fails the turn.
                 span.set_status(StatusCode.ERROR)
                 span.set_attribute(tracing.ERROR_TYPE, type(error).__name__)
+                record_tool_call(name, persona, time.perf_counter() - start, type(error).__name__)
                 raise
             # A result, not an exception, is how tools fail here (`handle_tool_error`
             # and ToolNode's argument validation). The turn goes on: the model reads
             # the error, so only this span is marked.
+            error_type = None
             if isinstance(result, ToolMessage) and result.status == "error":
                 span.set_status(StatusCode.ERROR)
                 span.set_attribute(tracing.ERROR_TYPE, TOOL_ERROR)
+                error_type = TOOL_ERROR
+            record_tool_call(name, persona, time.perf_counter() - start, error_type)
             if capture_content and isinstance(result, ToolMessage):
                 span.set_attribute(tracing.GEN_AI_TOOL_CALL_RESULT, result.text)
             return result
 
     return wrap_tool_call
+
+
+def record_tool_call(name: str, persona: str, seconds: float, error_type: str | None) -> None:
+    """The call's duration and its count, with the same `error.type` as its span."""
+    outcome = {tracing.ERROR_TYPE: error_type} if error_type else {}
+    metrics.execute_tool_duration.record(
+        seconds,
+        {
+            tracing.GEN_AI_TOOL_NAME: name,
+            tracing.GEN_AI_TOOL_TYPE: tracing.TOOL_TYPE_FUNCTION,
+            tracing.GEN_AI_AGENT_NAME: tracing.AGENT_NAME,
+            metrics.FORNADA_SIMULATOR_PERSONA_ID: persona,
+            **outcome,
+        },
+    )
+    metrics.tool_calls.add(
+        1,
+        {
+            tracing.GEN_AI_TOOL_NAME: name,
+            metrics.FORNADA_SIMULATOR_PERSONA_ID: persona,
+            **outcome,
+        },
+    )
 
 
 def customer_phone(args: dict[str, Any]) -> str | None:

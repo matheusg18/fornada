@@ -12,6 +12,7 @@ from langchain_core.tools import BaseTool
 from langgraph.graph import START, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
+from fornada_api.agents.attendant.metrics import TokenPrices
 from fornada_api.agents.attendant.nodes import make_call_model, make_wrap_tool_call
 from fornada_api.agents.attendant.prompt import SystemPrompt
 from fornada_api.agents.attendant.state import AttendantState, InputState, OutputState
@@ -23,10 +24,12 @@ def build_graph(
     prompt: SystemPrompt,
     *,
     capture_content: bool = False,
+    prices: TokenPrices | None = None,
 ) -> StateGraph[AttendantState, Any, InputState, OutputState]:
-    """`capture_content` puts conversation content and phones on the spans."""
+    """`capture_content` puts conversation content and phones on the spans;
+    `prices` turns on the cost metric."""
     builder = StateGraph(AttendantState, input_schema=InputState, output_schema=OutputState)
-    builder.add_node("call_model", make_call_model(model, tools, prompt, capture_content))
+    builder.add_node("call_model", make_call_model(model, tools, prompt, capture_content, prices))
     tool_node = ToolNode(list(tools), awrap_tool_call=make_wrap_tool_call(capture_content))
     builder.add_node("tools", tool_node)
     builder.add_edge(START, "call_model")

@@ -82,7 +82,7 @@ The request is "a tool error counter". A counter of all calls with `error.type` 
 
 ### 5. Cost per conversation = sum of cost ÷ conversations started
 
-The API does not know when a conversation ends (the client stops posting). `fornada.conversations` grows by 1 when a turn completes and its final state holds exactly one `HumanMessage`, i.e. it was the conversation's first successful turn. The checkpointer saves state only for completed turns, so a failed first turn followed by a successful retry counts once.
+The API does not know when a conversation ends (the client stops posting). `fornada.conversations` grows by 1 when a turn completes and no model answer without tool calls (a turn's final reply) comes before its customer message, i.e. it was the conversation's first successful turn. A failed turn never reaches a final reply, but the checkpointer does keep its customer message and any tool round it finished (checked during apply: after a failed model call the state holds the `HumanMessage`), so counting customer messages would miss a conversation whose first message failed and was retried.
 
 - Gives the **mean** per conversation over any time range, filterable by model and persona. The distribution (p95 conversation cost) comes from traces: sum `gen_ai.usage.*` per `session.id` in Langfuse.
 - A conversation that spans the edge of the selected range is split; with ranges of a batch or longer the error is small.

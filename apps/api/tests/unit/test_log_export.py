@@ -211,6 +211,32 @@ def test_telemetry_on_sets_up_and_shuts_down_metrics(
     assert calls[-1] == ("shutdown", provider)
 
 
+def price_warnings(spies: Spies) -> list[Any]:
+    return [
+        r for r in spies.exported() if r.log_record.body == "token prices are the default model's"
+    ]
+
+
+def test_changed_model_without_prices_logs_a_warning(
+    telemetry_on: Spies, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LLM__ANTHROPIC__MODEL", "claude-sonnet-5-5")
+    clear_caches()
+    with TestClient(app):
+        pass
+
+    (record,) = price_warnings(telemetry_on)
+    assert record.log_record.severity_number == SeverityNumber.WARN
+    assert record.log_record.attributes["llm_model"] == "claude-sonnet-5-5"
+
+
+def test_default_model_logs_no_price_warning(telemetry_on: Spies) -> None:
+    with TestClient(app):
+        pass
+
+    assert price_warnings(telemetry_on) == []
+
+
 # --- chaos mode ----------------------------------------------------------------
 
 
