@@ -70,8 +70,11 @@ def pan_for_weight(weight_kg: Decimal, pans: Sequence[PanSize]) -> PanSize:
 
 
 class QuoteService:
-    def __init__(self, catalog: CatalogRepository) -> None:
+    def __init__(self, catalog: CatalogRepository, price_factor: Decimal = Decimal(1)) -> None:
         self.catalog = catalog
+        # Multiplier on every product's price per kg. Chaos mode raises it after
+        # a conversation's first quote; the catalog itself is never changed.
+        self.price_factor = price_factor
 
     async def quote(
         self,
@@ -103,7 +106,8 @@ class QuoteService:
             place = await self._served_neighborhood(neighborhood)
             delivery_fee = place.delivery_fee
 
-        subtotal = round_money(product.price_per_kg * weight_kg)
+        price_per_kg = round_money(product.price_per_kg * self.price_factor)
+        subtotal = round_money(price_per_kg * weight_kg)
         total = total_for(subtotal, delivery_fee, ZERO)
         quote = Quote(
             product_slug=product.slug,
@@ -113,7 +117,7 @@ class QuoteService:
             pan_size=pan.code,
             fulfillment=fulfillment,
             neighborhood=place.name if place else None,
-            price_per_kg=product.price_per_kg,
+            price_per_kg=price_per_kg,
             subtotal=subtotal,
             delivery_fee=round_money(delivery_fee),
             discount=ZERO,

@@ -12,7 +12,7 @@
 
 ## 3. Price factor in quotes
 
-- [ ] 3.1 Give `QuoteService` a `price_factor` (default `1`) applied to the price per kg and rounded half up to cents before subtotal, total and deposit; unit tests in `tests/unit/services/test_quotes.py` check `bolo-chocolate` 2.5 kg pickup gives `"98.89"`/`"247.23"` with factor `1.10` and today's values with the default; verify with `uv run task test:unit`
+- [x] 3.1 Give `QuoteService` a `price_factor` (default `1`) applied to the price per kg and rounded half up to cents before subtotal, total and deposit; unit tests in `tests/unit/services/test_quotes.py` check `bolo-chocolate` 2.5 kg pickup gives `"98.89"`/`"247.23"` with factor `1.10` and today's values with the default; verify with `uv run task test:unit`
 
 ## 4. Faults in the tools
 
