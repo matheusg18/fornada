@@ -27,14 +27,32 @@ LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 class ProviderSettings(BaseModel):
     api_key: SecretStr | None = None
     model: str
+    # US dollars per million tokens, for the cost metric. Each provider's
+    # defaults are the published standard-tier prices of its default model.
+    input_usd_per_mtok: Decimal = Field(ge=0)
+    output_usd_per_mtok: Decimal = Field(ge=0)
+
+    @property
+    def prices_match_model(self) -> bool:
+        """False when the model was changed but the prices were left at the
+        default model's, so the cost metric is likely wrong."""
+        default_model = type(self).model_fields["model"].default
+        prices_set = {"input_usd_per_mtok", "output_usd_per_mtok"} & self.model_fields_set
+        return self.model == default_model or bool(prices_set)
 
 
 class AnthropicSettings(ProviderSettings):
     model: str = "claude-haiku-4-5"
+    # claude-api skill model table, cached 2026-10-06.
+    input_usd_per_mtok: Decimal = Field(default=Decimal("1.00"), ge=0)
+    output_usd_per_mtok: Decimal = Field(default=Decimal("5.00"), ge=0)
 
 
 class OpenAISettings(ProviderSettings):
     model: str = "gpt-5-mini"
+    # developers.openai.com/api/docs/pricing, standard tier, read 2026-10-18.
+    input_usd_per_mtok: Decimal = Field(default=Decimal("0.25"), ge=0)
+    output_usd_per_mtok: Decimal = Field(default=Decimal("2.00"), ge=0)
 
 
 class LlmSettings(BaseModel):

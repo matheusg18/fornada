@@ -4,9 +4,9 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: the provider setup, whi
 
 ## 1. Price settings
 
-- [ ] 1.1 Look up the current published input and output prices per million tokens for `claude-haiku-4-5` and `gpt-5-mini` (use the `claude-api` skill for Anthropic and OpenAI's pricing page; never from memory). Note the source and date for the code comment.
-- [ ] 1.2 Write failing tests in `tests/unit/core/test_config.py` for the `app-config` delta: overrides, defaults, a negative price naming `LLM__OPENAI__OUTPUT_USD_PER_MTOK`, and that `TELEMETRY__ENABLED` is documented as switching metrics too. Verify they fail.
-- [ ] 1.3 Add `input_usd_per_mtok` and `output_usd_per_mtok` (`Decimal`, `ge=0`) to `ProviderSettings` with per-provider defaults from 1.1 and a dated comment. Update the root `.env.example` (prices, and that telemetry now includes metrics). Verify 1.2 passes and `uv run task check` passes.
+- [x] 1.1 Look up the current published input and output prices per million tokens for `claude-haiku-4-5` and `gpt-5-mini` (use the `claude-api` skill for Anthropic and OpenAI's pricing page; never from memory). Note the source and date for the code comment.
+- [x] 1.2 Write failing tests in `tests/unit/core/test_config.py` for the `app-config` delta: overrides, defaults, a negative price naming `LLM__OPENAI__OUTPUT_USD_PER_MTOK`, and that `TELEMETRY__ENABLED` is documented as switching metrics too. Verify they fail.
+- [x] 1.3 Add `input_usd_per_mtok` and `output_usd_per_mtok` (`Decimal`, `ge=0`) to `ProviderSettings` with per-provider defaults from 1.1 and a dated comment. Update the root `.env.example` (prices, and that telemetry now includes metrics). Verify 1.2 passes and `uv run task check` passes.
 
 ## 2. Meter provider
 
