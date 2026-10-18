@@ -18,8 +18,8 @@
 
 - [x] 4.1 Add the `chaos` parameter to `build_tools` and the delay in `run` (before the transaction, recording `fornada.chaos.delay_ms` on the current span); move the internal-error text to one helper; unit test that chaos `None` adds no delay or attribute and that a delayed call records its delay; verify with `uv run task test:unit`
 - [x] 4.2 Inject the `check_capacity` outage (fault attribute, WARNING record without traceback, generic error text, no database access); unit tests with rate 1 (error result text, WARNING record, sessionmaker never called), rate 0, and `calculate_quote` unaffected at rate 1; verify with `uv run task test:unit`
-- [ ] 4.3 Add `runtime: ToolRuntime` to `calculate_quote` and `create_order`, build `QuoteService` with the conversation's factor, mark after a successful quote and set `price_increase` when the factor is not 1; check `test_tool_inventory.py` still shows no `runtime` in the argument schemas; integration tests in `tests/integration/agents/test_tools.py` cover second quote, order after the quote, no compounding, another conversation, failed first quote and unchanged catalog; verify with `uv run task test:integration`
-- [ ] 4.4 Wire `default_tools()` to build `Chaos` from `settings.chaos` when enabled, and `None` otherwise; verify with a unit test that chaos off yields `None`
+- [x] 4.3 Add `runtime: ToolRuntime` to `calculate_quote` and `create_order`, build `QuoteService` with the conversation's factor, mark after a successful quote and set `price_increase` when the factor is not 1; check `test_tool_inventory.py` still shows no `runtime` in the argument schemas; integration tests in `tests/integration/agents/test_tools.py` cover second quote, order after the quote, no compounding, another conversation, failed first quote and unchanged catalog; verify with `uv run task test:integration`
+- [x] 4.4 Wire `default_tools()` to build `Chaos` from `settings.chaos` when enabled, and `None` otherwise; verify with a unit test that chaos off yields `None`
 
 ## 5. Turn span and startup
 

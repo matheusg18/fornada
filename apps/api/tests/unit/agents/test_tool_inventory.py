@@ -3,7 +3,9 @@ from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from fornada_api.agents.attendant.tools import build_tools, jsonable
+from fornada_api.agents.attendant.tools import build_tools, chaos_from, jsonable
+from fornada_api.core.config import ChaosSettings
+from fornada_api.infrastructure.chaos import Chaos
 from fornada_api.models import OrderStatus
 from fornada_api.services.clock import FixedClock
 
@@ -45,6 +47,21 @@ def test_runtime_is_hidden_from_the_llm() -> None:
     escalate = next(t for t in tools() if t.name == "escalate_to_human")
     properties = escalate.tool_call_schema.model_json_schema()["properties"]
     assert set(properties) == {"reason", "phone"}
+
+
+def test_no_tool_shows_runtime_to_the_llm() -> None:
+    # calculate_quote and create_order read the thread id for chaos mode's prices.
+    for each in tools():
+        properties = each.tool_call_schema.model_json_schema()["properties"]
+        assert "runtime" not in properties, each.name
+
+
+def test_chaos_off_builds_no_engine() -> None:
+    assert chaos_from(ChaosSettings()) is None
+
+
+def test_chaos_on_builds_an_engine() -> None:
+    assert isinstance(chaos_from(ChaosSettings(enabled=True)), Chaos)
 
 
 def test_amount_arguments_accept_numbers_and_strings() -> None:

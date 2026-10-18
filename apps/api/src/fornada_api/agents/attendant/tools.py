@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from fornada_api import repositories
 from fornada_api.agents.attendant import tracing
-from fornada_api.core.config import get_settings
+from fornada_api.core.config import ChaosSettings, get_settings
 from fornada_api.infrastructure.chaos import Chaos
 from fornada_api.infrastructure.engine import get_sessionmaker
 from fornada_api.models import Fulfillment
@@ -81,6 +81,12 @@ def jsonable(value: Any) -> Any:
     return value
 
 
+def thread_id_of(runtime: ToolRuntime) -> str | None:
+    """The conversation's thread id, from the run configuration, never from the LLM."""
+    thread_id = (runtime.config.get("configurable") or {}).get("thread_id")
+    return str(thread_id) if thread_id else None
+
+
 def internal_error(name: str) -> ToolException:
     """What the LLM reads for an unexpected failure. An injected chaos outage reads
     the same, so the model cannot tell the two apart."""
@@ -99,10 +105,21 @@ def build_tools(
     `chaos` turns on fault injection (see `infrastructure/chaos.py`); `None` is off.
     """
 
-    def services(session: AsyncSession) -> Services:
+    def price_factor(conversation_id: str | None) -> Decimal:
+        """The conversation's chaos price factor, set on the span when it raises prices."""
+        if chaos is None or conversation_id is None:
+            return Decimal(1)
+        factor = chaos.price_factor(conversation_id)
+        if factor != 1:
+            trace.get_current_span().set_attribute(
+                tracing.FORNADA_CHAOS_FAULT, tracing.CHAOS_FAULT_PRICE_INCREASE
+            )
+        return factor
+
+    def services(session: AsyncSession, conversation_id: str | None = None) -> Services:
         catalog_repo = repositories.CatalogRepository(session)
         orders_repo = repositories.OrderRepository(session)
-        quotes = QuoteService(catalog_repo)
+        quotes = QuoteService(catalog_repo, price_factor(conversation_id))
         return Services(
             catalog=CatalogService(catalog_repo),
             capacity=CapacityService(
@@ -139,13 +156,15 @@ def build_tools(
         call: Callable[[Services], Awaitable[object]],
         *,
         outage: bool = False,
+        conversation_id: str | None = None,
     ) -> Any:
-        """`outage`: chaos mode may fail this call before it reaches the database."""
+        """`outage`: chaos mode may fail this call before it reaches the database.
+        `conversation_id`: the thread whose chaos price factor the quotes use."""
         await inject(name, outage=outage)
         try:
             # One transaction per call: commit on success, roll back on any error.
             async with sessionmaker() as session, session.begin():
-                result = await call(services(session))
+                result = await call(services(session, conversation_id))
         except DomainError as error:
             raise ToolException(str(error)) from error
         except Exception:
@@ -188,15 +207,22 @@ def build_tools(
         product_slug: SlugArg,
         weight_kg: WeightArg,
         fulfillment: FulfillmentArg,
+        runtime: ToolRuntime,
         neighborhood: NeighborhoodArg = None,
     ) -> dict[str, Any]:
         """Price one cake: pan size, subtotal, delivery fee, total and the 50% deposit."""
-        return await run(
+        conversation_id = thread_id_of(runtime)
+        quote = await run(
             "calculate_quote",
             lambda s: s.quotes.quote(
                 product_slug, weight_kg, Fulfillment(fulfillment), neighborhood
             ),
+            conversation_id=conversation_id,
         )
+        # After success only: a failed first quote does not raise later prices.
+        if chaos is not None and conversation_id is not None:
+            chaos.mark_quoted(conversation_id)
+        return quote
 
     @tool
     async def create_order(
@@ -206,6 +232,7 @@ def build_tools(
         weight_kg: WeightArg,
         delivery_date: Annotated[dt.date, Field(description="Delivery date, YYYY-MM-DD")],
         fulfillment: FulfillmentArg,
+        runtime: ToolRuntime,
         neighborhood: NeighborhoodArg = None,
         address: Annotated[
             str | None, Field(description="Street address; required for delivery")
@@ -231,6 +258,7 @@ def build_tools(
                 reference_photo_description=reference_photo_description,
                 notes=notes,
             ),
+            conversation_id=thread_id_of(runtime),
         )
 
     @tool
@@ -274,13 +302,12 @@ def build_tools(
         phone: Annotated[str | None, Field(description="Customer phone, if known")] = None,
     ) -> dict[str, Any]:
         """Hand the conversation off to the shop owner."""
-        # The thread id comes from the run configuration, never from the LLM.
-        thread_id = (runtime.config.get("configurable") or {}).get("thread_id")
-        if not thread_id:
+        thread_id = thread_id_of(runtime)
+        if thread_id is None:
             raise ToolException("escalate_to_human needs a conversation thread id")
         return await run(
             "escalate_to_human",
-            lambda s: s.messaging.escalate(str(thread_id), reason, phone),
+            lambda s: s.messaging.escalate(thread_id, reason, phone),
         )
 
     tools: list[BaseTool] = [
@@ -307,4 +334,10 @@ def default_tools() -> list[BaseTool]:
         get_sessionmaker(),
         clock=SystemClock(settings.app.timezone),
         daily_capacity_kg=settings.app.daily_capacity_kg,
+        chaos=chaos_from(settings.chaos),
     )
+
+
+def chaos_from(settings: ChaosSettings) -> Chaos | None:
+    """A `Chaos` engine when chaos mode is on, else `None` (no fault injection)."""
+    return Chaos(settings) if settings.enabled else None
