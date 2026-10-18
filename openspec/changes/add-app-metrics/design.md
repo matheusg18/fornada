@@ -41,6 +41,7 @@
 - **Delta in the app**, not `cumulativetodelta` in the Collector: one place, and the SDK does not keep cumulative state for series nobody reads. *Alternative: Collector processor.* Rejected: it keeps per-series state in the Collector and a Collector restart resets it, losing a point.
 - **10 s interval** instead of the 60 s default: a simulator batch lasts a few minutes, and with 60 s the p95 panel would have a handful of points. Volume stays tiny (a few dozen series).
 - *Alternative: `UpDownCounter`/gauges for cost.* Rejected: spend only grows, a counter is what Kibana sums.
+- **Instrumentors' metrics dropped** (found in task 5.2): once the global provider exists, the httpx2, SQLAlchemy and psycopg instrumentors record their default metrics (`http.client.request.duration`, `db.client.*`) through it. The Collector guard strips all their attributes, so they arrived as unlabeled totals, and APM already derives database and HTTP dependency latency from the spans. The provider drops their meters with `View(meter_name=..., aggregation=DropAggregation())`; psycopg's `instrument_connection` takes no meter provider, so a view is the one switch for all three. Turn one back on, with its attributes in the guard, when an observed failure needs it (e.g. `db.client.connections.usage` for pool exhaustion).
 
 `TODO(human)` with a commented sketch: the reader, temporality map and interval.
 

@@ -38,6 +38,7 @@ from opentelemetry.sdk.metrics import (
     UpDownCounter,
 )
 from opentelemetry.sdk.metrics.export import AggregationTemporality, PeriodicExportingMetricReader
+from opentelemetry.sdk.metrics.view import DropAggregation, View
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter
@@ -112,6 +113,15 @@ def build_logger_provider(
     return provider
 
 
+# Meters of the instrumentors the API uses (their scope names), whose metrics
+# are not exported. See `build_meter_provider`.
+INSTRUMENTATION_METERS = (
+    "opentelemetry.instrumentation.httpx",
+    "opentelemetry.instrumentation.psycopg",
+    "opentelemetry.instrumentation.sqlalchemy",
+)
+
+
 def build_meter_provider(settings: TelemetrySettings) -> MeterProvider:
     """Build the metric pipeline without registering it."""
     # Delta for every instrument kind: Elasticsearch drops cumulative
@@ -119,26 +129,6 @@ def build_meter_provider(settings: TelemetrySettings) -> MeterProvider:
     # being dropped silently. Explicit endpoint, so no OTEL_* variable
     # redirects it. Exported every 10 s (default 60 s) so a simulator batch of
     # a few minutes gives the p95 panel enough points.
-    DELTA = {kind: AggregationTemporality.DELTA for kind in (Counter, Histogram, ...)}
-    #
-    #    Weigh: UpDownCounter and the gauges model a level, not a change; delta
-    #    makes their points meaningless alone. We have none today. Map them to
-    #    DELTA anyway (one rule) or leave them CUMULATIVE (correct if one appears)?
-    #
-    # 2. Exporter. Same rules as the other two signals: an explicit endpoint, so
-    #    no OTEL_* variable redirects it.
-    #
-    #    from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
-    #    (a module-level import: the tests replace `telemetry.OTLPMetricExporter`)
-    #    exporter = OTLPMetricExporter(endpoint=metrics_url(settings), preferred_temporality=DELTA)
-    #
-    # 3. Reader and interval. A PeriodicExportingMetricReader collects every
-    #    instrument on a background thread and exports. Default 60 s; a simulator
-    #    batch lasts minutes, so 10 s gives the p95 panel enough points.
-    #
-    #    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-    #    reader = PeriodicExportingMetricReader(exporter, export_interval_millis=10_000)
-    #    return MeterProvider(resource=build_resource(), metric_readers=[reader])
     DELTA = {
         kind: AggregationTemporality.DELTA
         for kind in (
@@ -153,7 +143,14 @@ def build_meter_provider(settings: TelemetrySettings) -> MeterProvider:
 
     exporter = OTLPMetricExporter(endpoint=metrics_url(settings), preferred_temporality=DELTA)
     reader = PeriodicExportingMetricReader(exporter, export_interval_millis=10_000)
-    return MeterProvider(resource=build_resource(), metric_readers=[reader])
+    # The instrumentors record their default metrics through the global
+    # provider too. The Collector's guard strips their attributes, so they
+    # would arrive as unlabeled totals; APM already derives database and HTTP
+    # dependency latency from the spans. Dropped here, before export. psycopg
+    # takes no meter provider per connection, so a view is the one switch for
+    # all three.
+    drop = [View(meter_name=name, aggregation=DropAggregation()) for name in INSTRUMENTATION_METERS]
+    return MeterProvider(resource=build_resource(), metric_readers=[reader], views=drop)
 
 
 def setup_metrics(settings: TelemetrySettings) -> MeterProvider | None:

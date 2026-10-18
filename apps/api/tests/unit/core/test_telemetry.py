@@ -250,6 +250,24 @@ def test_buffered_measurements_are_exported_at_shutdown(spy: type[SpyMetricExpor
     assert point.value == 3
 
 
+@pytest.mark.parametrize(
+    "scope",
+    [
+        "opentelemetry.instrumentation.httpx",
+        "opentelemetry.instrumentation.psycopg",
+        "opentelemetry.instrumentation.sqlalchemy",
+    ],
+)
+def test_instrumentation_metrics_are_dropped(scope: str, spy: type[SpyMetricExporter]) -> None:
+    provider = build_meter_provider(ENABLED)
+    provider.get_meter(scope).create_histogram("db.client.operation.duration").record(0.1)
+    provider.get_meter(__name__).create_counter("turns").add(1)
+    shutdown_metrics(provider)
+
+    assert not points(spy.built[0], "db.client.operation.duration")
+    assert points(spy.built[0], "turns")
+
+
 def test_disabled_metrics_register_nothing() -> None:
     before = metrics.get_meter_provider()
     assert setup_metrics(TelemetrySettings(enabled=False)) is None
