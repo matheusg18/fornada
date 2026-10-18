@@ -125,6 +125,7 @@ service:
 
 - `.devcontainer/kibana/fornada-metrics.ndjson`: one data view (`metrics-*`, time field `@timestamp`) and one dashboard with Lens panels:
   - **Cost per conversation** (metric + line over time): formula `sum(metrics.fornada.gen_ai.cost) / sum(metrics.fornada.conversations)`, filter `service.name: fornada-api`.
+    The line uses running sums, `cumulative_sum(sum(...cost)) / cumulative_sum(sum(...conversations))`: per time bucket the plain ratio is meaningless, since a conversation is counted on its first turn but costs on every turn (found in task 6.2).
   - **p95 turn latency** (line): `percentile(metrics.gen_ai.invoke_agent.duration, percentile=95)`, broken down optionally by model.
   - **Error rate per tool** (bar): `sum(metrics.fornada.tool.calls, kql='attributes.error.type: *') / sum(metrics.fornada.tool.calls)`, broken down by `attributes.gen_ai.tool.name`.
   - Dashboard-level controls for `attributes.gen_ai.request.model` and `attributes.fornada.simulator.persona.id`.
