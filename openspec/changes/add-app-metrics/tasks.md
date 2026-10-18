@@ -29,7 +29,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 2: the provider setup, whi
 
 ## 5. Collector metrics pipeline
 
-- [ ] 5.1 `TODO(human)`: in `.devcontainer/otel-collector/config.yaml`, leave the marker with the commented sketch of `transform/metrics_guard` and the `metrics/elastic` pipeline (design.md, decision 7), and update the header comment that says the metrics pipeline comes later. Stop and wait. Then the maintainer restarts the Collector on the host.
+- [x] 5.1 (Written by the agent at the maintainer's request, no marker.) In `.devcontainer/otel-collector/config.yaml`, leave the marker with the commented sketch of `transform/metrics_guard` and the `metrics/elastic` pipeline (design.md, decision 7), and update the header comment that says the metrics pipeline comes later. Stop and wait. Then the maintainer restarts the Collector on the host.
 - [ ] 5.2 Verify from `dev`: with the API on and telemetry enabled, one turn makes `otelcol_receiver_accepted_metric_points` and `otelcol_exporter_sent_metric_points` for `elasticsearch/otel` grow with no failed points; in Kibana Dev Tools, `GET metrics-*/_search` with `service.name: fornada-api` shows `gen_ai.invoke_agent.duration` as a histogram and no attribute outside the allowlist; the Collector log has no "dropping cumulative temporality" warning. Record the field paths the exporter used for metrics and attributes.
 
 ## 6. Kibana dashboard

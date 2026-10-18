@@ -6,7 +6,8 @@
 # conversation content; Elasticsearch (Kibana APM) gets them redacted, with no
 # content and the customer phone only as a salted hash. Logs go to
 # Elasticsearch only (Langfuse takes traces), with the same redaction. The
-# metrics pipeline comes later in phase 2 step B.
+# app's metrics also go to Elasticsearch only (Langfuse has no OTLP metrics
+# ingestion), keeping only the allowed dimensions.
 #
 # Components and config keys follow EDOT 9.5.5, which is built on Collector
 # core v0.161.0.
@@ -82,11 +83,21 @@ processors:
       - set(log.attributes["fornada.customer.phone"], SHA256(Concat(["${env:PHONE_HASH_SALT}", log.attributes["fornada.customer.phone"]], ""))) where IsString(log.attributes["fornada.customer.phone"])
       - delete_key(log.attributes, "fornada.customer.phone") where log.attributes["fornada.customer.phone"] != nil and not IsString(log.attributes["fornada.customer.phone"])
 
+  # The app's metrics keep only their allowed dimensions (add-app-metrics,
+  # design.md, decision 7). An allowlist, not a denylist like the redaction:
+  # metrics have a closed set of dimensions, so any other attribute is a bug,
+  # and each new value of it would be a new series in Elasticsearch.
+  transform/metrics_guard:
+    # Fail closed, like the redaction: a statement error drops the batch.
+    error_mode: propagate
+    metric_statements:
+      # Data point attributes only; the resource (service.name...) is untouched.
+      - keep_matching_keys(datapoint.attributes, "^(gen_ai\\.(operation\\.name|provider\\.name|request\\.model|response\\.model|agent\\.name|tool\\.name|tool\\.type)|error\\.type|fornada\\.simulator\\.persona\\.id)$")
+
 connectors:
   elasticapm: {}
 
 service:
-  # Traces and logs. The metrics pipeline comes with the app's meter provider.
   pipelines:
     traces/langfuse:
       receivers: [otlp]
@@ -114,15 +125,24 @@ service:
       processors: [transform/redact_logs]
       exporters: [elasticsearch/otel]
 
+    # The app's own metrics (tokens, durations, tool calls, cost,
+    # conversations), delta temporality: the exporter drops cumulative
+    # histograms. No `elasticapm`: it is for traces.
+    metrics/elastic:
+      receivers: [otlp]
+      processors: [transform/metrics_guard]
+      exporters: [elasticsearch/otel]
+
     # APM metrics the connector builds from the redacted spans (latency,
     # throughput, error rate per service and transaction), for Kibana APM.
     metrics/apm:
       receivers: [elasticapm]
       exporters: [elasticsearch/otel]
 
-  # Internal metrics (otelcol_receiver_accepted_spans, otelcol_exporter_sent_spans)
-  # on :8888, readable from the `dev` container, which has no Docker access:
-  #   curl -s edot-collector:8888/metrics | grep spans
+  # Internal metrics (otelcol_receiver_accepted_spans, otelcol_exporter_sent_spans,
+  # and `_metric_points` for metrics) on :8888, readable from the `dev`
+  # container, which has no Docker access:
+  #   curl -s edot-collector:8888/metrics | grep -E 'spans|metric_points'
   telemetry:
     metrics:
       readers:
