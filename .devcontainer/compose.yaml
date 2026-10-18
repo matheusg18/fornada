@@ -322,6 +322,34 @@ services:
       retries: 30
       start_period: 60s
 
+  kibana-setup:
+    # One-shot, then exits: imports the committed dashboards (saved objects
+    # exported from Kibana) on every start. `overwrite=true` keeps their ids,
+    # so a changed file replaces the old version instead of adding a copy.
+    # Nothing depends on it: `dev` never waits for Kibana, and a failed import
+    # only shows in this service's logs (`docker compose logs kibana-setup`).
+    # Uses the Elasticsearch image for its curl, like elasticsearch-setup.
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.5
+    restart: "no"
+    depends_on:
+      kibana:
+        condition: service_healthy
+    environment:
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:?}
+    volumes:
+      - ./kibana:/kibana:ro
+    command:
+      - bash
+      - -ec
+      - |
+        for file in /kibana/*.ndjson; do
+          result=$$(curl -fsS -u "elastic:$$ELASTIC_PASSWORD" -H 'kbn-xsrf: true' \
+            -F "file=@$$file" 'http://kibana:5601/api/saved_objects/_import?overwrite=true')
+          echo "$$file: $$result"
+          # The import answers 200 even when objects fail; `success` says.
+          grep -q '"success":true' <<< "$$result"
+        done
+
   telemetrygen:
     # Smoke test for the Collector: sends 5 synthetic traces (2 spans each) and
     # exits. Behind a profile, so it never starts with the dev environment. Run
