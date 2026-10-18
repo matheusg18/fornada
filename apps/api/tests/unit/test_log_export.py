@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from opentelemetry._logs import SeverityNumber
 from opentelemetry.sdk._logs import LoggerProvider
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -159,3 +160,48 @@ def test_shutdown_stops_tracing_then_detaches_the_handler_then_stops_logs(
     # handed to a provider that has already shut down.
     assert telemetry_on.events[-1][1] == ["StreamHandler"]
     assert telemetry_on.handler_names() == ["StreamHandler"]
+
+
+# --- chaos mode ----------------------------------------------------------------
+
+
+def chaos_records(spies: Spies) -> list[Any]:
+    return [r for r in spies.exported() if r.log_record.body == "chaos mode enabled"]
+
+
+def test_chaos_on_logs_one_startup_warning(
+    telemetry_on: Spies, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CHAOS__ENABLED", "true")
+    monkeypatch.setenv("CHAOS__SEED", "42")
+    clear_caches()
+    with TestClient(app):
+        pass
+
+    (record,) = chaos_records(telemetry_on)
+    assert record.log_record.severity_number is SeverityNumber.WARN
+    attributes = dict(record.log_record.attributes or {})
+    assert {
+        key: attributes[key]
+        for key in (
+            "latency_min_ms",
+            "latency_max_ms",
+            "capacity_failure_rate",
+            "price_increase_pct",
+            "seeded",
+        )
+    } == {
+        "latency_min_ms": 200,
+        "latency_max_ms": 2000,
+        "capacity_failure_rate": 0.1,
+        "price_increase_pct": 10.0,
+        "seeded": True,
+    }
+    assert "42" not in str(attributes)
+
+
+def test_chaos_off_logs_no_chaos_record(telemetry_on: Spies) -> None:
+    with TestClient(app):
+        pass
+
+    assert chaos_records(telemetry_on) == []

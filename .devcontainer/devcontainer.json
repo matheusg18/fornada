@@ -55,6 +55,21 @@
       "settings": {
         "python.defaultInterpreterPath": "/workspaces/fornada/.venv/bin/python",
         "terminal.integrated.defaultProfile.linux": "zsh",
+        // App database in the `postgres` service. No password here: the
+        // extension asks for FORNADA_DB_PASSWORD (.devcontainer/.env) on the
+        // first connect and keeps it in VS Code's secret storage.
+        "pgsql.connections": [
+          {
+            "id": "fornada-devcontainer",
+            "profileName": "fornada (dev container)",
+            "server": "postgres",
+            "port": "5432",
+            "database": "fornada",
+            "user": "fornada",
+            "authenticationType": "SqlLogin",
+            "sslmode": "disable"
+          }
+        ],
         "[python]": {
           "editor.defaultFormatter": "charliermarsh.ruff",
           "editor.formatOnSave": true,

@@ -89,3 +89,31 @@ async def test_delivery_outside_the_area(service: QuoteService, name: str) -> No
 async def test_delivery_without_neighborhood(service: QuoteService) -> None:
     with pytest.raises(NeighborhoodRequired, match="Ipsep"):
         await service.quote("bolo-chocolate", Decimal("2.0"), DELIVERY, None)
+
+
+# --- price factor ------------------------------------------------------------------
+
+
+async def test_default_factor_keeps_the_catalog_price(service: QuoteService) -> None:
+    quote = await service.quote("bolo-chocolate", Decimal("2.5"), PICKUP)
+    assert quote.price_per_kg == Decimal("89.90")
+    assert quote.subtotal == Decimal("224.75")
+
+
+async def test_factor_raises_the_price_per_kg_before_the_amounts() -> None:
+    service = QuoteService(FakeCatalogRepository(seeded_db()), price_factor=Decimal("1.10"))
+    quote = await service.quote("bolo-chocolate", Decimal("2.5"), DELIVERY, "Ipsep")
+    # 89.90 * 1.10 = 98.89; 98.89 * 2.5 = 247.225, rounded half up.
+    assert quote.price_per_kg == Decimal("98.89")
+    assert quote.subtotal == Decimal("247.23")
+    assert quote.delivery_fee == Decimal("10.00")
+    assert quote.total == Decimal("257.23")
+    assert quote.deposit == Decimal("128.62")
+
+
+async def test_factor_rounds_the_price_half_up() -> None:
+    # 89.90 * 1.15 = 103.385: half up gives 103.39, half even would give 103.38.
+    service = QuoteService(FakeCatalogRepository(seeded_db()), price_factor=Decimal("1.15"))
+    quote = await service.quote("bolo-chocolate", Decimal("1.0"), PICKUP)
+    assert quote.price_per_kg == Decimal("103.39")
+    assert quote.subtotal == Decimal("103.39")

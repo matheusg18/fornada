@@ -57,3 +57,12 @@ FORNADA_CAPACITY_FREE_KG = "fornada.capacity.free_kg"
 # E.164 phone a tool was called with. Content too: only with capture on, and
 # the Collector replaces it with a salted hash before Elasticsearch.
 FORNADA_CUSTOMER_PHONE = "fornada.customer.phone"
+
+# Chaos mode (`CHAOS__ENABLED`). All absent with chaos off. `enabled` is `true`
+# on every turn span; `delay_ms` is the delay injected into each tool call; and
+# `fault` names the fault that changed a tool call's outcome.
+FORNADA_CHAOS_ENABLED = "fornada.chaos.enabled"
+FORNADA_CHAOS_DELAY_MS = "fornada.chaos.delay_ms"
+FORNADA_CHAOS_FAULT = "fornada.chaos.fault"
+CHAOS_FAULT_CAPACITY_UNAVAILABLE = "capacity_unavailable"
+CHAOS_FAULT_PRICE_INCREASE = "price_increase"

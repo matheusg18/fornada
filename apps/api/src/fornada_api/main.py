@@ -57,6 +57,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             graph.compile(checkpointer=checkpointer.saver),
             before_turn=checkpointer.ensure_setup,
             capture_content=capture,
+            chaos_enabled=settings.chaos.enabled,
         )
         logger.info(
             "fornada-api starting",
@@ -66,6 +67,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
                 "prompt_version": prompt.version,
             },
         )
+        if settings.chaos.enabled:
+            chaos = settings.chaos
+            # Faults are on in every conversation; say so loudly at startup.
+            logger.warning(
+                "chaos mode enabled",
+                extra={
+                    "latency_min_ms": chaos.latency_min_ms,
+                    "latency_max_ms": chaos.latency_max_ms,
+                    "capacity_failure_rate": chaos.capacity_failure_rate,
+                    "price_increase_pct": float(chaos.price_increase_pct),
+                    "seeded": chaos.seed is not None,
+                },
+            )
         yield
     finally:
         if checkpointer is not None:
