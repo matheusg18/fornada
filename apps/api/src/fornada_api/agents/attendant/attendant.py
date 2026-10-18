@@ -11,6 +11,7 @@ from uuid import UUID
 
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage
 from langgraph.graph.state import CompiledStateGraph
+from opentelemetry import baggage, context
 from opentelemetry.trace import SpanKind, StatusCode
 
 from fornada_api.agents.attendant import metrics, span_content, tracing
@@ -76,9 +77,14 @@ class GraphAttendant:
         # Read once per turn, before the graph runs; the nodes' tasks copy it.
         persona = metrics.persona_from_baggage()
         token = metrics.current_persona.set(persona)
+        # Then the client's baggage goes: the model provider's HTTP client
+        # injects the current context's baggage, and baggage is untrusted input
+        # of any size. Spans and the persona stay; the nodes' tasks copy both.
+        otel_token = context.attach(baggage.clear())
         try:
             return await self._reply(conversation_id, text, persona)
         finally:
+            context.detach(otel_token)
             metrics.current_persona.reset(token)
 
     async def _reply(self, conversation_id: UUID, text: str, persona: str) -> list[str]:

@@ -1,5 +1,7 @@
 import re
 
+from fornada_api.agents.attendant.metrics import PERSONAS as API_PERSONAS
+
 from fornada_simulator.personas import PERSONAS
 
 # The persona must read as a customer: no word that reveals what is under test.
@@ -23,3 +25,9 @@ def test_persona_text_does_not_reveal_the_test() -> None:
     for persona in PERSONAS:
         for text in (persona.description, *persona.goals):
             assert not FORBIDDEN.search(text), (persona.id, text)
+
+
+def test_persona_ids_match_the_apis_allowlist() -> None:
+    # The API records any other id as `other`: adding a persona here without
+    # adding it there would hide it on every metric.
+    assert {persona.id for persona in PERSONAS} == API_PERSONAS

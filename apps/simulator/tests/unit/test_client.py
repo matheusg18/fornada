@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import httpx2
 import pytest
-from opentelemetry import trace
+from opentelemetry import baggage, context, trace
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import NoOpTracer, SpanKind, StatusCode
@@ -228,3 +228,51 @@ async def test_server_port_follows_the_scheme_default(
 
     (span,) = client_spans(spans)
     assert attrs(span)["server.port"] == port
+
+
+# --- persona baggage (`client-tracing` spec) -------------------------------------
+
+
+def capture(seen: list[httpx2.Request]) -> httpx2.MockTransport:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return ok(request)
+
+    return httpx2.MockTransport(handler)
+
+
+async def test_baggage_carries_only_the_persona(spans: InMemorySpanExporter) -> None:
+    seen: list[httpx2.Request] = []
+    async with make_client(capture(seen)) as http:
+        await send_message(http, uuid4(), "oi", persona_id="apressada", run_id="run-1")
+
+    assert seen[0].headers["baggage"] == "fornada.simulator.persona.id=apressada"
+
+
+async def test_ambient_baggage_is_not_sent(spans: InMemorySpanExporter) -> None:
+    seen: list[httpx2.Request] = []
+    token = context.attach(baggage.set_baggage("user.id", "42"))
+    try:
+        async with make_client(capture(seen)) as http:
+            await send_message(http, uuid4(), "oi", persona_id="apressada")
+    finally:
+        context.detach(token)
+
+    assert seen[0].headers["baggage"] == "fornada.simulator.persona.id=apressada"
+
+
+async def test_no_baggage_without_a_persona(spans: InMemorySpanExporter) -> None:
+    seen: list[httpx2.Request] = []
+    async with make_client(capture(seen)) as http:
+        await send_message(http, uuid4(), "oi")
+
+    assert "baggage" not in seen[0].headers
+
+
+async def test_no_baggage_when_tracing_is_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(client, "tracer", NoOpTracer())
+    seen: list[httpx2.Request] = []
+    async with make_client(capture(seen)) as http:
+        await send_message(http, uuid4(), "oi", persona_id="apressada")
+
+    assert "baggage" not in seen[0].headers
