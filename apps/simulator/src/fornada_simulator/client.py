@@ -5,7 +5,8 @@ Message and reply text is never logged, only ids and failure kinds.
 
 Each post is one CLIENT span, the root of that turn's trace. Its context goes
 to the API in a `traceparent` header, so the API's spans join the trace (see
-the `client-tracing` spec).
+the `client-tracing` spec). With tracing on, a `baggage` header carries only
+the persona id, a dimension of the API's metrics; the run id stays on the span.
 """
 
 import logging
@@ -13,7 +14,7 @@ from typing import Any, Literal
 from uuid import UUID
 
 import httpx2
-from opentelemetry import propagate, trace
+from opentelemetry import baggage, propagate, trace
 from opentelemetry.context import Context
 from opentelemetry.trace import Span, SpanKind
 from opentelemetry.trace.status import StatusCode
@@ -114,19 +115,34 @@ async def send_message(
         set_status_on_exception=False,
     ) as span:
         try:
-            return await _post(http, conversation_id, text, span)
+            return await _post(http, conversation_id, text, span, persona_id)
         except ApiError as error:
             mark_failed(span, error)
             raise
 
 
+def outgoing_context(span: Span, persona_id: str | None) -> Context:
+    """What the post propagates: the client span and, with tracing on, the
+    persona as baggage. Built from an empty context, so no baggage set around
+    the call goes out."""
+    carried = trace.set_span_in_context(span, Context())
+    # A no-op span (tracing off) has no valid context.
+    if persona_id is not None and span.get_span_context().is_valid:
+        carried = baggage.set_baggage(PERSONA_ID, persona_id, carried)
+    return carried
+
+
 async def _post(
-    http: httpx2.AsyncClient, conversation_id: UUID, text: str, span: Span
+    http: httpx2.AsyncClient,
+    conversation_id: UUID,
+    text: str,
+    span: Span,
+    persona_id: str | None,
 ) -> list[str]:
-    # The current span's context, as `traceparent`. Nothing is added when
-    # tracing is off: a no-op span has no valid context.
+    # The span's context as `traceparent`, and the persona as `baggage`.
+    # Nothing is added when tracing is off.
     headers: dict[str, str] = {}
-    propagate.inject(headers)
+    propagate.inject(headers, context=outgoing_context(span, persona_id))
     try:
         response = await http.post(
             URL_TEMPLATE.format(conversation_id=conversation_id),

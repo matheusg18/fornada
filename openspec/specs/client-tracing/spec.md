@@ -65,7 +65,7 @@ Each client span SHALL carry the conversation id as `session.id` and as `gen_ai.
 - **THEN** the client span has `session.id` and `gen_ai.conversation.id` equal to that id
 
 ### Requirement: Simulator spans name the persona and batch
-Each simulator client span SHALL carry the persona's identifier as `fornada.simulator.persona.id` and the batch run id as `fornada.simulator.run.id`. These attributes SHALL stay on the client span, and the API SHALL NOT read them from the request.
+Each simulator client span SHALL carry the persona's identifier as `fornada.simulator.persona.id` and the batch run id as `fornada.simulator.run.id`. These attributes SHALL stay on the client span: the API SHALL put neither on any span it exports, and SHALL NOT read the run id from the request.
 
 #### Scenario: Persona on the client span
 - **WHEN** the simulator plays persona `apressada` in run `20261012T120000-ab12`
@@ -117,3 +117,22 @@ With tracing enabled in the simulator, the API and the Collector, a batch of N c
 #### Scenario: Default batch of 20
 - **WHEN** a default batch (4 runs × 5 personas) runs with tracing enabled end to end
 - **THEN** Langfuse has 20 sessions whose ids are the batch's conversation ids, and no trace in them has a missing root or a second root
+
+### Requirement: The simulator propagates the persona in baggage
+With tracing enabled, each message the simulator posts SHALL carry a W3C `baggage` header with the entry `fornada.simulator.persona.id` set to the persona's identifier, and no other entry. The chat SHALL send no `baggage` header. With tracing disabled, no client SHALL send a `baggage` header.
+
+#### Scenario: Persona in baggage
+- **WHEN** tracing is enabled and the simulator posts a message for persona `mae_alergica`
+- **THEN** the request has a `baggage` header whose only entry is `fornada.simulator.persona.id=mae_alergica`
+
+#### Scenario: No run id in baggage
+- **WHEN** the simulator posts a message in run `20261012T120000-ab12`
+- **THEN** the `baggage` header does not contain the run id
+
+#### Scenario: Chat sends no baggage
+- **WHEN** tracing is enabled and the chat posts a message
+- **THEN** the request has no `baggage` header
+
+#### Scenario: Tracing off
+- **WHEN** the simulator runs with `TELEMETRY__ENABLED` unset
+- **THEN** the API receives no `baggage` header

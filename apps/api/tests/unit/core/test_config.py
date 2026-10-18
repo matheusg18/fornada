@@ -102,6 +102,47 @@ def test_model_override(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None
     assert load().llm.anthropic.model == "claude-sonnet-5-5"
 
 
+def test_price_defaults(with_key: None) -> None:
+    llm = load().llm
+    assert llm.anthropic.input_usd_per_mtok == Decimal("1.00")
+    assert llm.anthropic.output_usd_per_mtok == Decimal("5.00")
+    assert llm.openai.input_usd_per_mtok == Decimal("0.25")
+    assert llm.openai.output_usd_per_mtok == Decimal("2.00")
+
+
+def test_price_override(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM__ANTHROPIC__INPUT_USD_PER_MTOK", "3")
+    assert load().llm.anthropic.input_usd_per_mtok == Decimal("3")
+
+
+def test_negative_price(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM__OPENAI__OUTPUT_USD_PER_MTOK", "-1")
+    with pytest.raises(ConfigError, match="LLM__OPENAI__OUTPUT_USD_PER_MTOK"):
+        load()
+
+
+def test_zero_price_is_allowed(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    # A free local model is a valid setup.
+    monkeypatch.setenv("LLM__OPENAI__INPUT_USD_PER_MTOK", "0")
+    assert load().llm.openai.input_usd_per_mtok == Decimal("0")
+
+
+@pytest.mark.parametrize(
+    ("model", "expected"), [("claude-haiku-4-5", True), ("claude-sonnet-5-5", False)]
+)
+def test_default_prices_match_model(
+    model: str, expected: bool, with_key: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LLM__ANTHROPIC__MODEL", model)
+    assert load().llm.anthropic.prices_match_model is expected
+
+
+def test_overridden_prices_match_any_model(with_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM__ANTHROPIC__MODEL", "claude-sonnet-5-5")
+    monkeypatch.setenv("LLM__ANTHROPIC__INPUT_USD_PER_MTOK", "2")
+    assert load().llm.anthropic.prices_match_model is True
+
+
 def test_active_provider_without_key() -> None:
     with pytest.raises(ConfigError, match="LLM__ANTHROPIC__API_KEY"):
         load()

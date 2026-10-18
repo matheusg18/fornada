@@ -9,6 +9,10 @@ the Anthropic and OpenAI SDKs (plain `httpx` carries no request on a
 conversation turn, so it is not instrumented) and the SQLAlchemy engine the
 tools use.
 
+`build_meter_provider` is registered globally by `setup_metrics`, like the
+tracer provider: the agent's instruments come from `metrics.get_meter`, a proxy
+until then and a no-op when telemetry is off.
+
 `build_logger_provider` is not registered globally: `configure_logging` hands
 it to the OTLP log handler directly, so no other code can pick it up and tests
 need no process-wide state.
@@ -16,13 +20,25 @@ need no process-wide state.
 
 import os
 
-from opentelemetry import trace
+from opentelemetry import metrics, trace
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.httpx import HTTPX2ClientInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from opentelemetry.sdk._logs import LoggerProvider
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor, LogRecordExporter
+from opentelemetry.sdk.metrics import (
+    Counter,
+    Histogram,
+    MeterProvider,
+    ObservableCounter,
+    ObservableGauge,
+    ObservableUpDownCounter,
+    UpDownCounter,
+)
+from opentelemetry.sdk.metrics.export import AggregationTemporality, PeriodicExportingMetricReader
+from opentelemetry.sdk.metrics.view import DropAggregation, View
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter
@@ -46,6 +62,10 @@ def traces_url(settings: TelemetrySettings) -> str:
 
 def logs_url(settings: TelemetrySettings) -> str:
     return f"{settings.otlp_endpoint}/v1/logs"
+
+
+def metrics_url(settings: TelemetrySettings) -> str:
+    return f"{settings.otlp_endpoint}/v1/metrics"
 
 
 def build_resource() -> Resource:
@@ -91,6 +111,64 @@ def build_logger_provider(
     provider = LoggerProvider(resource=build_resource())
     provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
     return provider
+
+
+# Meters of the instrumentors the API uses (their scope names), whose metrics
+# are not exported. See `build_meter_provider`.
+INSTRUMENTATION_METERS = (
+    "opentelemetry.instrumentation.httpx",
+    "opentelemetry.instrumentation.psycopg",
+    "opentelemetry.instrumentation.sqlalchemy",
+)
+
+
+def build_meter_provider(settings: TelemetrySettings) -> MeterProvider:
+    """Build the metric pipeline without registering it."""
+    # Delta for every instrument kind: Elasticsearch drops cumulative
+    # histograms, and one rule for all kinds keeps a future instrument from
+    # being dropped silently. Explicit endpoint, so no OTEL_* variable
+    # redirects it. Exported every 10 s (default 60 s) so a simulator batch of
+    # a few minutes gives the p95 panel enough points.
+    DELTA = {
+        kind: AggregationTemporality.DELTA
+        for kind in (
+            Counter,
+            Histogram,
+            ObservableCounter,
+            ObservableGauge,
+            ObservableUpDownCounter,
+            UpDownCounter,
+        )
+    }
+
+    exporter = OTLPMetricExporter(endpoint=metrics_url(settings), preferred_temporality=DELTA)
+    reader = PeriodicExportingMetricReader(exporter, export_interval_millis=10_000)
+    # The instrumentors record their default metrics through the global
+    # provider too. The Collector's guard strips their attributes, so they
+    # would arrive as unlabeled totals; APM already derives database and HTTP
+    # dependency latency from the spans. Dropped here, before export. psycopg
+    # takes no meter provider per connection, so a view is the one switch for
+    # all three.
+    drop = [View(meter_name=name, aggregation=DropAggregation()) for name in INSTRUMENTATION_METERS]
+    return MeterProvider(resource=build_resource(), metric_readers=[reader], views=drop)
+
+
+def setup_metrics(settings: TelemetrySettings) -> MeterProvider | None:
+    """Register metrics for the process. Returns the provider to shut down, or
+    None when telemetry is disabled."""
+    if not settings.enabled:
+        return None
+
+    provider = build_meter_provider(settings)
+    # Global so the instruments' proxy meter resolves to it. Set once per
+    # process; a second call is ignored with a warning.
+    metrics.set_meter_provider(provider)
+    return provider
+
+
+def shutdown_metrics(provider: MeterProvider) -> None:
+    """Collect and export what was recorded since the last export, then stop."""
+    provider.shutdown()
 
 
 def instrument_engine(engine: AsyncEngine, provider: TracerProvider) -> None:

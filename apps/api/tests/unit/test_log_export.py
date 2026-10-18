@@ -1,6 +1,6 @@
-"""Log export wired into the app. Like `test_tracing.py`, these tests never
-let the lifespan register real tracing: they spy on the setup and build the
-logger provider on an in-memory exporter."""
+"""Log and metric export wired into the app. Like `test_tracing.py`, these
+tests never let the lifespan register real tracing or metrics: they spy on the
+setup and build the logger provider on an in-memory exporter."""
 
 import logging
 import sys
@@ -90,6 +90,13 @@ def telemetry_on(
     monkeypatch.setattr(main_module, "build_logger_provider", fake_build)
     monkeypatch.setattr(main_module, "shutdown_logging", fake_shutdown_logging)
     monkeypatch.setattr(main_module, "setup_tracing", lambda settings, engine: object())
+    # Never a real meter provider: it would register globally and export over OTLP.
+    monkeypatch.setattr(main_module, "setup_metrics", lambda settings: object())
+    monkeypatch.setattr(
+        main_module,
+        "shutdown_metrics",
+        lambda provider: spies.events.append(("shutdown_metrics", spies.handler_names())),
+    )
     monkeypatch.setattr(
         main_module,
         "shutdown_tracing",
@@ -149,17 +156,85 @@ def test_startup_log_has_no_trace_id(telemetry_on: Spies) -> None:
     assert not starting.log_record.trace_id
 
 
-def test_shutdown_stops_tracing_then_detaches_the_handler_then_stops_logs(
+def test_shutdown_stops_tracing_and_metrics_then_detaches_the_handler_then_stops_logs(
     telemetry_on: Spies,
 ) -> None:
     with TestClient(app):
         assert "LoggingHandler" in telemetry_on.handler_names()
 
-    assert [name for name, _ in telemetry_on.events] == ["shutdown_tracing", "shutdown_logging"]
+    assert [name for name, _ in telemetry_on.events] == [
+        "shutdown_tracing",
+        "shutdown_metrics",
+        "shutdown_logging",
+    ]
+    # Metrics still flush while the OTLP log handler is attached, so a record
+    # about a failed last export still reaches the Collector.
+    assert "LoggingHandler" in telemetry_on.events[1][1]
     # The OTLP handler is gone before the provider stops, so no record is
     # handed to a provider that has already shut down.
     assert telemetry_on.events[-1][1] == ["StreamHandler"]
     assert telemetry_on.handler_names() == ["StreamHandler"]
+
+
+# --- metrics -------------------------------------------------------------------
+
+
+def test_telemetry_off_shuts_down_no_meter_provider(
+    monkeypatch: pytest.MonkeyPatch, restore_logging: None
+) -> None:
+    configure_env(monkeypatch, telemetry=False)
+    shutdowns: list[object] = []
+    monkeypatch.setattr(main_module, "shutdown_metrics", shutdowns.append)
+
+    with TestClient(app):
+        pass
+
+    # `setup_metrics` returns None when telemetry is off; nothing to shut down.
+    assert shutdowns == []
+
+
+def test_telemetry_on_sets_up_and_shuts_down_metrics(
+    monkeypatch: pytest.MonkeyPatch, telemetry_on: Spies
+) -> None:
+    provider = object()
+    calls: list[tuple[str, object]] = []
+
+    def fake_setup(settings: TelemetrySettings) -> object:
+        calls.append(("setup", settings))
+        return provider
+
+    monkeypatch.setattr(main_module, "setup_metrics", fake_setup)
+    monkeypatch.setattr(main_module, "shutdown_metrics", lambda p: calls.append(("shutdown", p)))
+
+    with TestClient(app):
+        assert calls == [("setup", get_settings().telemetry)]
+    assert calls[-1] == ("shutdown", provider)
+
+
+def price_warnings(spies: Spies) -> list[Any]:
+    return [
+        r for r in spies.exported() if r.log_record.body == "token prices are the default model's"
+    ]
+
+
+def test_changed_model_without_prices_logs_a_warning(
+    telemetry_on: Spies, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LLM__ANTHROPIC__MODEL", "claude-sonnet-5-5")
+    clear_caches()
+    with TestClient(app):
+        pass
+
+    (record,) = price_warnings(telemetry_on)
+    assert record.log_record.severity_number == SeverityNumber.WARN
+    assert record.log_record.attributes["llm_model"] == "claude-sonnet-5-5"
+
+
+def test_default_model_logs_no_price_warning(telemetry_on: Spies) -> None:
+    with TestClient(app):
+        pass
+
+    assert price_warnings(telemetry_on) == []
 
 
 # --- chaos mode ----------------------------------------------------------------
