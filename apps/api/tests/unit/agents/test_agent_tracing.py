@@ -1,9 +1,11 @@
 """The attendant's spans (`agent-tracing` spec), read back from the session's
 in-memory exporter. The scripted model never touches the network."""
 
+import datetime as dt
 import json
 import uuid
-from typing import Any
+from decimal import Decimal
+from typing import Any, cast
 
 import pytest
 from langchain_anthropic import ChatAnthropic
@@ -17,11 +19,16 @@ from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import NoOpTracer, SpanKind, StatusCode
 from pydantic import SecretStr
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from fornada_api.agents.attendant import tracing
 from fornada_api.agents.attendant.attendant import FALLBACK_REPLY, GraphAttendant
 from fornada_api.agents.attendant.graph import build_graph
 from fornada_api.agents.attendant.prompt import load_system_prompt
+from fornada_api.agents.attendant.tools import build_tools
+from fornada_api.core.config import ChaosSettings
+from fornada_api.infrastructure.chaos import Chaos
+from fornada_api.services.clock import FixedClock
 from tests.unit.agents.fakes import ScriptedChatModel, tool_call
 
 pytestmark = pytest.mark.anyio
@@ -702,3 +709,75 @@ async def test_same_turn_with_and_without_content_capture(
     plain_replies, plain_stored = await run(False)
     assert captured_replies == plain_replies == [["Temos bolo"], ["ok"]]
     assert comparable(captured_stored) == comparable(plain_stored)
+
+
+# --- chaos mode ------------------------------------------------------------------
+
+
+class NoDatabase:
+    """Stands in for `async_sessionmaker`; tools that reach it fail as internal errors."""
+
+    def __call__(self) -> Any:
+        raise RuntimeError("no database in unit tests")
+
+
+def build_with_real_tools(model: ScriptedChatModel, chaos: Chaos | None) -> GraphAttendant:
+    tools = build_tools(
+        cast(async_sessionmaker[AsyncSession], NoDatabase()),
+        clock=FixedClock(dt.date(2026, 10, 7)),
+        daily_capacity_kg=Decimal(15),
+        chaos=chaos,
+    )
+    compiled = build_graph(model, tools, PROMPT).compile(checkpointer=InMemorySaver())
+    return GraphAttendant(compiled, chaos_enabled=chaos is not None)
+
+
+def catalog_and_capacity() -> ScriptedChatModel:
+    both = calls(
+        ("search_catalog", {}, "c1"),
+        ("check_capacity", {"date": "2026-10-20"}, "c2"),
+    )
+    return ScriptedChatModel(answers=[both, AIMessage("ok")])
+
+
+def always_failing_capacity() -> Chaos:
+    settings = ChaosSettings(
+        enabled=True, latency_min_ms=1, latency_max_ms=1, capacity_failure_rate=1.0
+    )
+    return Chaos(settings)
+
+
+async def test_chaos_marks_the_turn_span(spans: InMemorySpanExporter) -> None:
+    agent = build_with_real_tools(catalog_and_capacity(), always_failing_capacity())
+    await agent.reply(uuid.uuid4(), "tem bolo para dia 20?")
+
+    (turn,) = turn_spans(spans)
+    assert attrs(turn)[tracing.FORNADA_CHAOS_ENABLED] is True
+
+
+async def test_chaos_records_delays_and_the_outage_on_tool_spans(
+    spans: InMemorySpanExporter,
+) -> None:
+    agent = build_with_real_tools(catalog_and_capacity(), always_failing_capacity())
+    await agent.reply(uuid.uuid4(), "tem bolo para dia 20?")
+
+    found = {s.name: s for s in tool_spans(spans)}
+    catalog = found["execute_tool search_catalog"]
+    capacity = found["execute_tool check_capacity"]
+    assert attrs(catalog)[tracing.FORNADA_CHAOS_DELAY_MS] == 1
+    assert attrs(capacity)[tracing.FORNADA_CHAOS_DELAY_MS] == 1
+    # Latency alone is not a fault; the search failed on the fake database, not by chaos.
+    assert tracing.FORNADA_CHAOS_FAULT not in attrs(catalog)
+    assert attrs(capacity)[tracing.FORNADA_CHAOS_FAULT] == "capacity_unavailable"
+    assert capacity.status.status_code is StatusCode.ERROR
+    assert attrs(capacity)[tracing.ERROR_TYPE] == "tool_error"
+
+
+async def test_chaos_off_leaves_no_chaos_attribute(spans: InMemorySpanExporter) -> None:
+    agent = build_with_real_tools(catalog_and_capacity(), None)
+    await agent.reply(uuid.uuid4(), "tem bolo para dia 20?")
+
+    finished = spans.get_finished_spans()
+    assert finished
+    for span in finished:
+        assert not [k for k in attrs(span) if k.startswith("fornada.chaos.")], span.name

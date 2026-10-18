@@ -45,12 +45,15 @@ class GraphAttendant:
         before_turn: Callable[[], Awaitable[None]] | None = None,
         *,
         capture_content: bool = False,
+        chaos_enabled: bool = False,
     ) -> None:
         self._graph = graph
         # Runs before every turn, for one-time setup such as the checkpointer tables.
         self._before_turn = before_turn
         # Puts the customer message and the replies on the turn span.
         self._capture_content = capture_content
+        # Marks every turn span of a chaos-mode run, so its traces can be filtered.
+        self._chaos_enabled = chaos_enabled
 
     async def reply(self, conversation_id: UUID, text: str) -> list[str]:
         if self._before_turn:
@@ -60,12 +63,15 @@ class GraphAttendant:
             "recursion_limit": RECURSION_LIMIT,
         }
         conversation = str(conversation_id)
-        attributes = {
+        attributes: dict[str, str | bool] = {
             tracing.GEN_AI_OPERATION_NAME: tracing.OP_INVOKE_AGENT,
             tracing.GEN_AI_AGENT_NAME: tracing.AGENT_NAME,
             tracing.GEN_AI_CONVERSATION_ID: conversation,
             tracing.SESSION_ID: conversation,
         }
+        if self._chaos_enabled:
+            # Absent, not false, with chaos off.
+            attributes[tracing.FORNADA_CHAOS_ENABLED] = True
         if self._capture_content:
             attributes[tracing.GEN_AI_INPUT_MESSAGES] = span_content.text_messages("user", [text])
         # The turn span. Nodes run inside it, so `chat` and `execute_tool`

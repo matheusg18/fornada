@@ -23,8 +23,8 @@
 
 ## 5. Turn span and startup
 
-- [ ] 5.1 Add `chaos_enabled` to `GraphAttendant` and set `fornada.chaos.enabled` on the turn span when true; extend `tests/unit/agents/test_agent_tracing.py` for on (attribute present on the turn span, `delay_ms` on tool spans, `capacity_unavailable` span with status ERROR and `error.type = tool_error`) and off (no `fornada.chaos.*` attribute on any span); verify with `uv run task test:unit`
-- [ ] 5.2 Pass `settings.chaos.enabled` from the lifespan and log the startup WARNING with range, rate, increase and `seeded`; test that the record appears only with chaos on; verify with `uv run task test:unit`
+- [x] 5.1 Add `chaos_enabled` to `GraphAttendant` and set `fornada.chaos.enabled` on the turn span when true; extend `tests/unit/agents/test_agent_tracing.py` for on (attribute present on the turn span, `delay_ms` on tool spans, `capacity_unavailable` span with status ERROR and `error.type = tool_error`) and off (no `fornada.chaos.*` attribute on any span); verify with `uv run task test:unit`
+- [x] 5.2 Pass `settings.chaos.enabled` from the lifespan and log the startup WARNING with range, rate, increase and `seeded`; test that the record appears only with chaos on; verify with `uv run task test:unit`
 
 ## 6. Docs and end-to-end check
 
