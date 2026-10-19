@@ -19,8 +19,8 @@
 
 ## 4. Docs and notebook
 
-- [ ] 4.1 Update `apps/simulator/README.md` (matrix, filter, resume, fields) and `AGENTS.md` (the two launches: DB reset, chaos settings for `ferramenta_fora`, the `fornada.chaos.enabled` check); verify the documented commands match the CLI's `--help`
-- [ ] 4.2 Add a notebook cell that loads a matrix run file and shows the per-axis summary, committed with outputs cleared; verify with `jq '[.cells[].outputs | length] | add'` returning 0
+- [x] 4.1 Update `apps/simulator/README.md` (matrix, filter, resume, fields) and `AGENTS.md` (the two launches: DB reset, chaos settings for `ferramenta_fora`, the `fornada.chaos.enabled` check); verify the documented commands match the CLI's `--help`
+- [x] 4.2 Add a notebook cell that loads a matrix run file and shows the per-axis summary, committed with outputs cleared; verify with `jq '[.cells[].outputs | length] | add'` returning 0
 
 ## 5. Pilot and full run
 

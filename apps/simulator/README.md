@@ -19,6 +19,47 @@ notebook in `notebooks/simulator.ipynb` runs one conversation turn by turn, runs
 a batch and summarizes it per persona. Its kernel is the root `.venv`, with the
 notebook group installed (`uv sync --group notebook`).
 
+## Scenario matrix
+
+For phase 3's error analysis, `uv run task matrix` plays a persona × intent ×
+complication matrix instead of the personas' fixed goals. Each cell is one
+conversation, and its goal is the intent's text followed by the complication's
+(`src/fornada_simulator/scenarios.py`). The persona's description still sets
+tone and style. The cheater plays its style only: its attack goals stay in the
+persona batch.
+
+| Axis | Ids |
+|---|---|
+| Persona | `apressada`, `indecisa`, `pechincheira`, `mae_alergica`, `malandro` |
+| Intent | `retirada`, `entrega`, `orcamento`, `duvida_cardapio`, `pos_pedido` |
+| Complication | `nenhuma` (control), `data_lotada`, `troca_sabor`, `ferramenta_fora`, `tamanho_ambiguo` |
+
+`data_lotada` asks for day +3, which the seed fills, so reset the database
+before a launch. `ferramenta_fora` only asks for a dated order: the outage comes
+from the API in chaos mode. That is why its 25 cells run only when named, never
+next to the cells that need a working capacity check. The full run is two
+launches into one run file:
+
+```bash
+# 1. Normal API, fresh seed: the 100 cells that need a working API.
+uv run task matrix
+# 2. API restarted with CHAOS__ENABLED=true CHAOS__CAPACITY_FAILURE_RATE=1,
+#    fresh seed: the 25 outage cells, appended to the same run.
+uv run task matrix --run-id <run_id> --complications ferramenta_fora
+```
+
+| Option | Meaning |
+|---|---|
+| `--complications a,b` | Run only the cells with these complications; an unknown id stops the launch before any conversation |
+| `--run-id <id>` | Resume that run: cells it already recorded as `completed` or `max_turns` are skipped, error cells run again, new lines are appended |
+| `--limit N` | Run at most N pending cells (the cost pilot: `--limit 5`) |
+
+Matrix transcripts add `intent_id` and `complication_id`; persona batch lines
+and older files have both null. A cell retried on resume appears twice in the
+file, and its last line is the one that counts (`latest_per_cell`). At the end,
+the command prints outcome counts per complication and per intent for the whole
+run.
+
 ## Configuration
 
 Settings come from the environment and the root `.env` (see `.env.example`).
@@ -50,6 +91,9 @@ The client span carries:
 - `fornada.simulator.persona.id` and `fornada.simulator.run.id`: the persona
   and the batch. They stay on this span; the API reads nothing from the
   request but `traceparent`;
+- on matrix runs, `fornada.simulator.intent.id` and
+  `fornada.simulator.complication.id`: the cell. Client span only, never in
+  baggage;
 - `http.request.method`, `url.template`, `server.address`, `server.port` and
   `http.response.status_code`.
 
