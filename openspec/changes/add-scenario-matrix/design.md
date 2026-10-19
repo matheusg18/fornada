@@ -86,6 +86,10 @@ The 5-cell pilot ended 2 of 5 conversations after one turn: the attendant asked 
 
 Alternative considered: a code check that rejects a bare `[FIM]` after a question. Rejected, because telling a question apart needs a judgment, and a prompt rule is enough for a simulator, which is not a security boundary. The pilot is re-run to check the fix.
 
+### 8. An 8-turn cap for the matrix run
+
+With the end rule, the re-run pilot cost US$ 0.080 per conversation on the agent's side (US$ 10.04 projected for 125), and 2 of 5 conversations reached the 12-turn cap. The matrix run uses `SIMULATOR__MAX_TURNS=8`: open coding annotates the first error of each conversation, which shows up early, and the cut lowers the cost. The cap is a run setting, not code. The persona batch keeps its default of 12.
+
 ### Measurement
 
 This change adds no eval or guardrail. What it measures is cost: the 5-cell pilot (`--limit 5`) gives the cost per conversation from Langfuse sessions (the agent's side) before the full run. The full run is projected from it and must stay under about US$ 10, half of the monthly budget. The persona model is not traced, so its cost is estimated from the provider's dashboard.
