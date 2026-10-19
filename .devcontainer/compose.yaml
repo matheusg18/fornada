@@ -139,7 +139,7 @@ services:
 
   clickhouse:
     # Langfuse v4 requires ClickHouse >= 25.12.
-    image: docker.io/clickhouse/clickhouse-server:26.9.8.3
+    image: docker.io/clickhouse/clickhouse-server:26.9.16.11
     restart: unless-stopped
     user: "101:101"
     environment:
@@ -172,7 +172,7 @@ services:
 
   minio:
     # Chainguard's free tier only publishes `latest`, so it is pinned by digest.
-    image: cgr.dev/chainguard/minio:latest@sha256:a05a4497e8dce3cb7a7a1bf1872ba5d30ea988f1e8c22c9e0920503761c4b5f1
+    image: cgr.dev/chainguard/minio:latest@sha256:2136d593beacf4461187035eca949fe49abd589d5079735025c711ca58fee0c8
     restart: unless-stopped
     entrypoint: sh
     # Create the `langfuse` bucket before starting the server.
@@ -354,7 +354,7 @@ services:
     # Smoke test for the Collector: sends 5 synthetic traces (2 spans each) and
     # exits. Behind a profile, so it never starts with the dev environment. Run
     # it from the host (see AGENTS.md, "Dev environment").
-    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.162.0
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.163.0
     profiles: [smoke-test]
     depends_on:
       - edot-collector
