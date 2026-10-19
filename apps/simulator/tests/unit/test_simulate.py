@@ -13,9 +13,16 @@ from opentelemetry.trace import SpanKind
 
 from fornada_simulator import simulate
 from fornada_simulator.personas import PERSONAS
+from fornada_simulator.scenarios import plan_matrix
 from fornada_simulator.settings import SimulatorSettings
-from fornada_simulator.simulate import END_MARKER, plan_jobs, run_batch, run_conversation
-from fornada_simulator.transcript import read_jsonl
+from fornada_simulator.simulate import (
+    END_MARKER,
+    plan_jobs,
+    run_batch,
+    run_conversation,
+    run_matrix,
+)
+from fornada_simulator.transcript import cell_key, latest_per_cell, read_jsonl
 
 pytestmark = pytest.mark.anyio
 
@@ -276,3 +283,110 @@ async def test_concurrent_conversations_keep_their_own_traces(
             attributes["fornada.simulator.persona.id"] == persona_of[str(attributes["session.id"])]
         )
         assert attributes["fornada.simulator.run.id"] == "run-1"
+
+
+# --- matrix --------------------------------------------------------------------
+
+
+class EndingModel:
+    async def ainvoke(self, input: list[BaseMessage], /) -> BaseMessage:
+        return AIMessage(f"oi {END_MARKER}")
+
+
+async def test_matrix_records_each_cell(tmp_path: Path) -> None:
+    cells = plan_matrix()[:5]
+    run_id, transcripts = await run_matrix(
+        settings(),
+        EndingModel(),
+        cells,
+        runs_dir=tmp_path,
+        transport=httpx2.MockTransport(replies_ok),
+    )
+    recorded = read_jsonl(tmp_path / f"{run_id}.jsonl")
+    assert len(transcripts) == 5
+    assert [cell_key(t) for t in recorded] == [cell.key for cell in cells]
+    assert [t.goal for t in recorded] == [cell.goal for cell in cells]
+
+
+async def test_resume_plays_only_the_missing_cells(tmp_path: Path) -> None:
+    cells = plan_matrix()[:10]
+    await run_matrix(
+        settings(),
+        EndingModel(),
+        cells,
+        runs_dir=tmp_path,
+        run_id="run",
+        limit=4,
+        transport=httpx2.MockTransport(replies_ok),
+    )
+    _, resumed = await run_matrix(
+        settings(),
+        EndingModel(),
+        cells,
+        runs_dir=tmp_path,
+        run_id="run",
+        transport=httpx2.MockTransport(replies_ok),
+    )
+    assert [cell_key(t) for t in resumed] == [cell.key for cell in cells[4:]]
+    recorded = read_jsonl(tmp_path / "run.jsonl")
+    assert sorted(cell_key(t) for t in recorded) == sorted(cell.key for cell in cells)
+
+
+async def test_resume_replays_a_failed_cell(tmp_path: Path) -> None:
+    cells = plan_matrix()[:3]
+
+    def fail_second_cell(request: httpx2.Request) -> httpx2.Response:
+        nonlocal posts
+        posts += 1
+        return httpx2.Response(503) if posts == 2 else replies_ok(request)
+
+    posts = 0
+    await run_matrix(
+        settings(),
+        EndingModel(),
+        cells,
+        runs_dir=tmp_path,
+        run_id="run",
+        transport=httpx2.MockTransport(fail_second_cell),
+    )
+    _, resumed = await run_matrix(
+        settings(),
+        EndingModel(),
+        cells,
+        runs_dir=tmp_path,
+        run_id="run",
+        transport=httpx2.MockTransport(replies_ok),
+    )
+    assert [cell_key(t) for t in resumed] == [cells[1].key]
+    latest = latest_per_cell(read_jsonl(tmp_path / "run.jsonl"))
+    assert len(latest) == 3
+    assert all(t.outcome == "completed" for t in latest)
+
+
+async def test_outage_cells_join_the_same_run(tmp_path: Path) -> None:
+    transport = httpx2.MockTransport(replies_ok)
+    first = plan_matrix(["nenhuma"])
+    await run_matrix(
+        settings(), EndingModel(), first, runs_dir=tmp_path, run_id="run", transport=transport
+    )
+    await run_matrix(
+        settings(),
+        EndingModel(),
+        plan_matrix(["ferramenta_fora"]),
+        runs_dir=tmp_path,
+        run_id="run",
+        transport=transport,
+    )
+    recorded = read_jsonl(tmp_path / "run.jsonl")
+    assert len(recorded) == 50
+    assert {t.complication_id for t in recorded} == {"nenhuma", "ferramenta_fora"}
+
+
+async def test_persona_batch_records_no_cell(tmp_path: Path) -> None:
+    transcripts = await run_batch(
+        settings(runs_per_persona=1),
+        EndingModel(),
+        runs_dir=tmp_path,
+        transport=httpx2.MockTransport(replies_ok),
+    )
+    assert all(t.intent_id is None and t.complication_id is None for t in transcripts)

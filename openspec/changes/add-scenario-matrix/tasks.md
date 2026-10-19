@@ -12,10 +12,10 @@
 
 ## 3. Matrix batch, resume and CLI
 
-- [ ] 3.1 Add `run_matrix(settings, model, runs_dir, complications, run_id, limit)` that skips cells whose last recorded outcome is `completed` or `max_turns` and appends to the run file; verify with tests using the scripted model and mock transport: a resumed run plays only the missing cells, an `api_error` cell is replayed, a filtered resume appends to the same file
-- [ ] 3.2 Add `summarize_by(transcripts, key)` with last-line-per-cell dedupe and verify with unit tests for per-complication and per-intent rows
-- [ ] 3.3 Add `python -m fornada_simulator.matrix` (`--complications`, `--run-id`, `--limit`) and the taskipy task `matrix`; verify that an unknown complication exits before any conversation and that `uv run task matrix --limit 0` (or the help) runs without errors
-- [ ] 3.4 Run `uv run task check` in `apps/simulator` and verify it passes
+- [x] 3.1 Add `run_matrix(settings, model, runs_dir, complications, run_id, limit)` that skips cells whose last recorded outcome is `completed` or `max_turns` and appends to the run file; verify with tests using the scripted model and mock transport: a resumed run plays only the missing cells, an `api_error` cell is replayed, a filtered resume appends to the same file
+- [x] 3.2 Add `summarize_by(transcripts, key)` with last-line-per-cell dedupe and verify with unit tests for per-complication and per-intent rows
+- [x] 3.3 Add `python -m fornada_simulator.matrix` (`--complications`, `--run-id`, `--limit`) and the taskipy task `matrix`; verify that an unknown complication exits before any conversation and that `uv run task matrix --limit 0` (or the help) runs without errors
+- [x] 3.4 Run `uv run task check` in `apps/simulator` and verify it passes
 
 ## 4. Docs and notebook
 

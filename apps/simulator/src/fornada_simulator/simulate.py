@@ -9,6 +9,7 @@ import asyncio
 import logging
 import time
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
@@ -18,9 +19,18 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 
 from fornada_simulator.client import ApiError, send_message
 from fornada_simulator.personas import PERSONAS, Persona
+from fornada_simulator.scenarios import Cell
 from fornada_simulator.settings import SimulatorSettings
 from fornada_simulator.telemetry import flush_tracing
-from fornada_simulator.transcript import Message, Outcome, Transcript, append_jsonl
+from fornada_simulator.transcript import (
+    Message,
+    Outcome,
+    Transcript,
+    append_jsonl,
+    cell_key,
+    latest_per_cell,
+    read_jsonl,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -165,6 +175,50 @@ def new_run_id() -> str:
     return f"{datetime.now(UTC):%Y%m%dT%H%M%S}-{uuid.uuid4().hex[:4]}"
 
 
+# One planned conversation: persona, goal, intent id, complication id.
+Job = tuple[Persona, str, str | None, str | None]
+
+# Outcomes a resumed matrix run keeps; error outcomes are played again.
+FINISHED: frozenset[Outcome] = frozenset({"completed", "max_turns"})
+
+
+async def _run_jobs(
+    settings: SimulatorSettings,
+    model: ChatModel,
+    jobs: Sequence[Job],
+    *,
+    path: Path,
+    run_id: str,
+    transport: httpx2.AsyncBaseTransport | None,
+) -> list[Transcript]:
+    semaphore = asyncio.Semaphore(settings.concurrency)
+
+    async with httpx2.AsyncClient(
+        base_url=settings.api_url, timeout=120, transport=transport
+    ) as http:
+
+        async def one(job: Job) -> Transcript:
+            persona, goal, intent_id, complication_id = job
+            async with semaphore:
+                transcript = await run_conversation(
+                    persona,
+                    goal,
+                    http,
+                    model,
+                    max_turns=settings.max_turns,
+                    run_id=run_id,
+                    intent_id=intent_id,
+                    complication_id=complication_id,
+                )
+            append_jsonl(path, transcript)
+            return transcript
+
+        try:
+            return list(await asyncio.gather(*(one(job) for job in jobs)))
+        finally:
+            flush_tracing()
+
+
 async def run_batch(
     settings: SimulatorSettings,
     model: ChatModel,
@@ -179,23 +233,42 @@ async def run_batch(
     after (the CLI, a notebook cell) leaves no trace without its root.
     """
     run_id = run_id or new_run_id()
+    jobs = [(persona, goal, None, None) for persona, goal in plan_jobs(settings.runs_per_persona)]
+    return await _run_jobs(
+        settings, model, jobs, path=runs_dir / f"{run_id}.jsonl", run_id=run_id, transport=transport
+    )
+
+
+def pending_cells(cells: Sequence[Cell], path: Path) -> list[Cell]:
+    """The cells the run file at `path` has not finished; all of them if it is new."""
+    if not path.exists():
+        return list(cells)
+    done = {cell_key(t) for t in latest_per_cell(read_jsonl(path)) if t.outcome in FINISHED}
+    return [cell for cell in cells if cell.key not in done]
+
+
+async def run_matrix(
+    settings: SimulatorSettings,
+    model: ChatModel,
+    cells: Sequence[Cell],
+    *,
+    runs_dir: Path,
+    run_id: str | None = None,
+    limit: int | None = None,
+    transport: httpx2.AsyncBaseTransport | None = None,
+) -> tuple[str, list[Transcript]]:
+    """Play the matrix cells the run has not finished; return its id and the new transcripts.
+
+    With the id of an existing run, the batch resumes it: cells already recorded
+    as `completed` or `max_turns` are skipped, and new lines are appended to the
+    same file. `limit` caps how many pending cells run (the cost pilot).
+    """
+    run_id = run_id or new_run_id()
     path = runs_dir / f"{run_id}.jsonl"
-    semaphore = asyncio.Semaphore(settings.concurrency)
-
-    async with httpx2.AsyncClient(
-        base_url=settings.api_url, timeout=120, transport=transport
-    ) as http:
-
-        async def one(persona: Persona, goal: str) -> Transcript:
-            async with semaphore:
-                transcript = await run_conversation(
-                    persona, goal, http, model, max_turns=settings.max_turns, run_id=run_id
-                )
-            append_jsonl(path, transcript)
-            return transcript
-
-        jobs = plan_jobs(settings.runs_per_persona)
-        try:
-            return list(await asyncio.gather(*(one(persona, goal) for persona, goal in jobs)))
-        finally:
-            flush_tracing()
+    pending = pending_cells(cells, path)
+    if limit is not None:
+        pending = pending[:limit]
+    jobs = [(c.persona, c.goal, c.intent.id, c.complication.id) for c in pending]
+    return run_id, await _run_jobs(
+        settings, model, jobs, path=path, run_id=run_id, transport=transport
+    )

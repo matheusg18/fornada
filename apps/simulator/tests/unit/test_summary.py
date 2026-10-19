@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from fornada_simulator.summary import format_transcript, summarize
+from fornada_simulator.summary import format_axis, format_transcript, summarize, summarize_by
 from fornada_simulator.transcript import Message, Outcome, Transcript
 
 
@@ -57,3 +57,51 @@ def test_format_transcript_shows_outcome_and_speakers() -> None:
     assert "outcome=completed" in text
     assert "CLIENTE : oi" in text
     assert "ATENDENTE: olá!" in text
+
+
+def cell(
+    intent: str, complication: str, outcome: Outcome, persona: str = "apressada"
+) -> Transcript:
+    return make(persona, outcome, 1, 1.0).model_copy(
+        update={"intent_id": intent, "complication_id": complication}
+    )
+
+
+def test_rows_per_complication_and_per_intent() -> None:
+    transcripts = [
+        cell("retirada", "nenhuma", "completed"),
+        cell("retirada", "data_lotada", "max_turns"),
+        cell("entrega", "nenhuma", "completed"),
+        cell("entrega", "data_lotada", "completed", persona="indecisa"),
+    ]
+    by_complication = summarize_by(transcripts, lambda t: t.complication_id)
+    assert [(r.value, r.conversations) for r in by_complication] == [
+        ("nenhuma", 2),
+        ("data_lotada", 2),
+    ]
+    assert by_complication[1].outcomes["max_turns"] == 1
+    by_intent = summarize_by(transcripts, lambda t: t.intent_id)
+    assert [(r.value, r.outcomes["completed"]) for r in by_intent] == [
+        ("retirada", 1),
+        ("entrega", 2),
+    ]
+
+
+def test_a_retried_cell_counts_by_its_last_line() -> None:
+    rows = summarize_by(
+        [cell("retirada", "nenhuma", "api_error"), cell("retirada", "nenhuma", "completed")],
+        lambda t: t.complication_id,
+    )
+    (row,) = rows
+    assert row.conversations == 1
+    assert row.outcomes["completed"] == 1
+    assert row.outcomes["api_error"] == 0
+
+
+def test_format_axis_has_a_row_per_value() -> None:
+    text = format_axis(
+        "intent", summarize_by([cell("retirada", "nenhuma", "completed")], lambda t: t.intent_id)
+    )
+    header, row = text.splitlines()
+    assert header.split()[:2] == ["intent", "total"]
+    assert row.split()[:3] == ["retirada", "1", "1"]
