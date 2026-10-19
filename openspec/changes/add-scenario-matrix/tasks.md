@@ -27,8 +27,8 @@
 - [x] 5.0 Add the matrix end rule to the persona's instructions (matrix conversations only), verify with unit tests that the matrix prompt has it and the persona batch prompt is unchanged, run `uv run task check`, then reset the DB and re-run the 5-cell pilot and verify no conversation ends with a bare `[FIM]` after one turn
 - [x] 5.1 Reset the DB, start the API with telemetry on, run `uv run task matrix --limit 5`; verify 5 lines in the run file, 5 Langfuse sessions with the cell attributes on the client spans, and record the cost per conversation (projection for 125 must stay under US$ 10)
 - [x] 5.2 Reset the DB and run the 100 default cells with `SIMULATOR__MAX_TURNS=8`; verify the printout shows 20 cells per complication and the run file has 100 cells counted once
-- [ ] 5.3 Reset the DB, restart the API with `CHAOS__ENABLED=true CHAOS__CAPACITY_FAILURE_RATE=1`, resume the run with `SIMULATOR__MAX_TURNS=8` and `--complications ferramenta_fora`; verify 125 cells in the file and that only `ferramenta_fora` turns have `fornada.chaos.enabled`
-- [ ] 5.4 Build the conversation viewer as a private Claude artifact from the run file, following the `v0` viewer (index, chat, persona and outcome filters) plus intent and complication filters and a clickable 5 × 5 grid per persona; verify it loads all 125 conversations and each filter narrows the index
+- [x] 5.3 Reset the DB, restart the API with `CHAOS__ENABLED=true CHAOS__CAPACITY_FAILURE_RATE=1`, resume the run with `SIMULATOR__MAX_TURNS=8` and `--complications ferramenta_fora`; verify 125 cells in the file and that only `ferramenta_fora` turns have `fornada.chaos.enabled`
+- [x] 5.4 Build the conversation viewer as a private Claude artifact from the run file, following the `v0` viewer (index, chat, persona and outcome filters) plus intent and complication filters and a clickable 5 × 5 grid per persona; verify it loads all 125 conversations and each filter narrows the index
 
 ## Workflow follow-up
 
