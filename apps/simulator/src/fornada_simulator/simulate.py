@@ -66,6 +66,8 @@ async def run_conversation(
     *,
     max_turns: int,
     run_id: str,
+    intent_id: str | None = None,
+    complication_id: str | None = None,
 ) -> Transcript:
     """Play one conversation; always returns a transcript with its outcome."""
     conversation_id = uuid.uuid4()
@@ -101,7 +103,13 @@ async def run_conversation(
             turns += 1
             try:
                 replies = await send_message(
-                    http, conversation_id, text, persona_id=persona.id, run_id=run_id
+                    http,
+                    conversation_id,
+                    text,
+                    persona_id=persona.id,
+                    run_id=run_id,
+                    intent_id=intent_id,
+                    complication_id=complication_id,
                 )
             except ApiError:
                 outcome = "api_error"
@@ -118,6 +126,8 @@ async def run_conversation(
     transcript = Transcript(
         run_id=run_id,
         persona_id=persona.id,
+        intent_id=intent_id,
+        complication_id=complication_id,
         goal=goal,
         conversation_id=conversation_id,
         outcome=outcome,

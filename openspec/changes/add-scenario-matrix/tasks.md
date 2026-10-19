@@ -7,8 +7,8 @@
 
 ## 2. Transcript and client span fields
 
-- [ ] 2.1 Add optional `intent_id` and `complication_id` to `Transcript`; verify that an old run file in `runs/` still loads with both null and that a matrix transcript round-trips through `append_jsonl`/`read_jsonl`
-- [ ] 2.2 Pass the cell through `run_conversation` and `send_message` and set `fornada.simulator.intent.id` and `fornada.simulator.complication.id` on the client span only when present; verify with the in-memory exporter that matrix spans carry both, persona batch spans carry neither, and the `baggage` header still carries only the persona
+- [x] 2.1 Add optional `intent_id` and `complication_id` to `Transcript`; verify that an old run file in `runs/` still loads with both null and that a matrix transcript round-trips through `append_jsonl`/`read_jsonl`
+- [x] 2.2 Pass the cell through `run_conversation` and `send_message` and set `fornada.simulator.intent.id` and `fornada.simulator.complication.id` on the client span only when present; verify with the in-memory exporter that matrix spans carry both, persona batch spans carry neither, and the `baggage` header still carries only the persona
 
 ## 3. Matrix batch, resume and CLI
 

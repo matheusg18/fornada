@@ -24,6 +24,9 @@ class Message(BaseModel):
 class Transcript(BaseModel):
     run_id: str
     persona_id: str
+    # The matrix cell; None for the persona batch and for files written before it.
+    intent_id: str | None = None
+    complication_id: str | None = None
     goal: str
     conversation_id: UUID
     outcome: Outcome

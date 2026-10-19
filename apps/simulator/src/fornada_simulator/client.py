@@ -6,7 +6,8 @@ Message and reply text is never logged, only ids and failure kinds.
 Each post is one CLIENT span, the root of that turn's trace. Its context goes
 to the API in a `traceparent` header, so the API's spans join the trace (see
 the `client-tracing` spec). With tracing on, a `baggage` header carries only
-the persona id, a dimension of the API's metrics; the run id stays on the span.
+the persona id, a dimension of the API's metrics; the run id and the matrix
+cell stay on the span.
 """
 
 import logging
@@ -42,6 +43,8 @@ GEN_AI_CONVERSATION_ID = "gen_ai.conversation.id"
 ERROR_TYPE = "error.type"
 PERSONA_ID = "fornada.simulator.persona.id"
 RUN_ID = "fornada.simulator.run.id"
+INTENT_ID = "fornada.simulator.intent.id"
+COMPLICATION_ID = "fornada.simulator.complication.id"
 
 
 class ApiError(Exception):
@@ -67,6 +70,8 @@ def request_attributes(
     conversation_id: UUID,
     persona_id: str | None,
     run_id: str | None,
+    intent_id: str | None = None,
+    complication_id: str | None = None,
 ) -> dict[str, Any]:
     """The client span's attributes, known before the request is sent."""
     attributes = {
@@ -81,6 +86,11 @@ def request_attributes(
         attributes[PERSONA_ID] = persona_id
     if run_id is not None:
         attributes[RUN_ID] = run_id
+    # The matrix cell; like the run id, never sent to the API.
+    if intent_id is not None:
+        attributes[INTENT_ID] = intent_id
+    if complication_id is not None:
+        attributes[COMPLICATION_ID] = complication_id
     return attributes
 
 
@@ -102,12 +112,16 @@ async def send_message(
     *,
     persona_id: str | None = None,
     run_id: str | None = None,
+    intent_id: str | None = None,
+    complication_id: str | None = None,
 ) -> list[str]:
     """Post one customer message; return the attendant's reply texts, in order."""
     with tracer.start_as_current_span(
         SPAN_NAME,
         kind=SpanKind.CLIENT,
-        attributes=request_attributes(http, conversation_id, persona_id, run_id),
+        attributes=request_attributes(
+            http, conversation_id, persona_id, run_id, intent_id, complication_id
+        ),
         # Always a root: one trace per turn, whatever span is current.
         context=Context(),
         # The default description is the exception message; `mark_failed`

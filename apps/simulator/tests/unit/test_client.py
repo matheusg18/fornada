@@ -149,6 +149,32 @@ async def test_span_without_persona_has_no_persona_attributes(
     assert "fornada.simulator.run.id" not in attrs(span)
 
 
+async def test_matrix_span_carries_the_cell(spans: InMemorySpanExporter) -> None:
+    async with make_client(httpx2.MockTransport(ok)) as http:
+        await send_message(
+            http,
+            uuid4(),
+            "oi",
+            persona_id="indecisa",
+            run_id="run-1",
+            intent_id="entrega",
+            complication_id="troca_sabor",
+        )
+
+    (span,) = client_spans(spans)
+    assert attrs(span)["fornada.simulator.intent.id"] == "entrega"
+    assert attrs(span)["fornada.simulator.complication.id"] == "troca_sabor"
+
+
+async def test_persona_batch_span_carries_no_cell(spans: InMemorySpanExporter) -> None:
+    async with make_client(httpx2.MockTransport(ok)) as http:
+        await send_message(http, uuid4(), "oi", persona_id="apressada", run_id="run-1")
+
+    (span,) = client_spans(spans)
+    assert "fornada.simulator.intent.id" not in attrs(span)
+    assert "fornada.simulator.complication.id" not in attrs(span)
+
+
 async def test_span_carries_no_message_text(spans: InMemorySpanExporter) -> None:
     async with make_client(httpx2.MockTransport(ok)) as http:
         await send_message(http, uuid4(), "Meu telefone é 81987654321", persona_id="apressada")
@@ -245,6 +271,22 @@ async def test_baggage_carries_only_the_persona(spans: InMemorySpanExporter) -> 
     seen: list[httpx2.Request] = []
     async with make_client(capture(seen)) as http:
         await send_message(http, uuid4(), "oi", persona_id="apressada", run_id="run-1")
+
+    assert seen[0].headers["baggage"] == "fornada.simulator.persona.id=apressada"
+
+
+async def test_baggage_leaves_the_cell_out(spans: InMemorySpanExporter) -> None:
+    seen: list[httpx2.Request] = []
+    async with make_client(capture(seen)) as http:
+        await send_message(
+            http,
+            uuid4(),
+            "oi",
+            persona_id="apressada",
+            run_id="run-1",
+            intent_id="retirada",
+            complication_id="data_lotada",
+        )
 
     assert seen[0].headers["baggage"] == "fornada.simulator.persona.id=apressada"
 
