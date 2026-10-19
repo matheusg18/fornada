@@ -80,6 +80,12 @@ Alternative considered: a separate state file. Rejected, because the run file al
 
 The DB is reset before each of the two launches (`psql ... schema.sql seed.sql`), so day +3 is full when the run starts. During a run, orders accumulate. Day +3 only gets fuller, which keeps `data_lotada` valid, but other dates also fill up, so a late `nenhuma` cell can hit a date that is full. This is accepted: it is realistic, and the trace's `check_capacity` result shows it during annotation. The order texts spread dates ("semana que vem", "daqui a 6 dias") to soften it.
 
+### 7. A stricter end rule for matrix personas
+
+The 5-cell pilot ended 2 of 5 conversations after one turn: the attendant asked for the date and gpt-5-mini answered with only `[FIM]`. The `v0` batch has the same pattern. Such a conversation never reaches its complication and counts as `completed`, so it would read as an agent success while it is a simulator failure. Matrix conversations get one more rule in the persona's instructions: answer the attendant's pending question, and send `[FIM]` only when the goal is resolved or abandoned. The persona batch keeps the current text, because changing its simulator would move the `v0` baseline.
+
+Alternative considered: a code check that rejects a bare `[FIM]` after a question. Rejected, because telling a question apart needs a judgment, and a prompt rule is enough for a simulator, which is not a security boundary. The pilot is re-run to check the fix.
+
 ### Measurement
 
 This change adds no eval or guardrail. What it measures is cost: the 5-cell pilot (`--limit 5`) gives the cost per conversation from Langfuse sessions (the agent's side) before the full run. The full run is projected from it and must stay under about US$ 10, half of the monthly budget. The persona model is not traced, so its cost is estimated from the provider's dashboard.

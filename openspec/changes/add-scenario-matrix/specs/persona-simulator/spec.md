@@ -39,6 +39,17 @@ The `data_lotada` complication SHALL ask for the date 3 days from today, which t
 - **WHEN** the goal of a `ferramenta_fora` cell is built
 - **THEN** it names a delivery date and says nothing about a failure or an unavailable system
 
+### Requirement: Matrix personas end only when they are done
+In a matrix conversation, the persona's instructions SHALL tell it to send the end marker only when its goal is resolved or it has given up, and to answer the attendant's pending question instead of ending. The persona batch's instructions SHALL stay as they are, so its conversations remain comparable with `v0`.
+
+#### Scenario: Matrix prompt
+- **WHEN** the instructions of a matrix conversation are built
+- **THEN** they say to answer a pending question and to end only when the goal is resolved or abandoned
+
+#### Scenario: Persona batch prompt unchanged
+- **WHEN** the instructions of a persona batch conversation are built
+- **THEN** they are the same text as before this change
+
 ### Requirement: The matrix batch plans each cell once
 A matrix batch SHALL plan every persona × intent × complication cell exactly once (125 cells in total). Cells SHALL be ordered so that every persona appears once before any persona appears again, so a batch cut short stays balanced across personas.
 

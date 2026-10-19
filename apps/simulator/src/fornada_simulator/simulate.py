@@ -44,7 +44,19 @@ class ChatModel(Protocol):
     async def ainvoke(self, input: list[BaseMessage], /) -> BaseMessage: ...
 
 
-def build_system_prompt(persona: Persona, goal: str) -> str:
+# Matrix conversations only. In the pilot, the persona's model ended after one
+# turn with a bare marker, ignoring the attendant's question, so the cell never
+# reached its complication. The persona batch keeps its text: changing it would
+# move the `v0` baseline.
+MATRIX_END_RULE = (
+    "- Se a atendente fez uma pergunta, responda antes de qualquer outra coisa. "
+    f"Só use {END_MARKER} quando o seu objetivo estiver resolvido ou quando você "
+    "tiver desistido de vez; nunca mande só o marcador no lugar de uma resposta."
+)
+
+
+def build_system_prompt(persona: Persona, goal: str, *, matrix: bool = False) -> str:
+    end_rule = f"\n{MATRIX_END_RULE}" if matrix else ""
     return (
         f"{persona.description}\n\n"
         f"O que você quer agora: {goal}\n\n"
@@ -56,6 +68,7 @@ def build_system_prompt(persona: Persona, goal: str) -> str:
         "- Só fale o que o cliente sabe; não invente informações da loja.\n"
         f"- Quando a conversa terminar (você fechou, desistiu ou se despediu), "
         f"termine a sua mensagem com {END_MARKER}."
+        f"{end_rule}"
     )
 
 
@@ -83,7 +96,8 @@ async def run_conversation(
     conversation_id = uuid.uuid4()
     started = time.monotonic()
     history: list[BaseMessage] = [
-        SystemMessage(build_system_prompt(persona, goal)),
+        # A cell's intent marks a matrix conversation.
+        SystemMessage(build_system_prompt(persona, goal, matrix=intent_id is not None)),
         HumanMessage(START_PROMPT),
     ]
     messages: list[Message] = []

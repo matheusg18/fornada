@@ -17,6 +17,8 @@ from fornada_simulator.scenarios import plan_matrix
 from fornada_simulator.settings import SimulatorSettings
 from fornada_simulator.simulate import (
     END_MARKER,
+    MATRIX_END_RULE,
+    build_system_prompt,
     plan_jobs,
     run_batch,
     run_conversation,
@@ -390,3 +392,35 @@ async def test_persona_batch_records_no_cell(tmp_path: Path) -> None:
         transport=httpx2.MockTransport(replies_ok),
     )
     assert all(t.intent_id is None and t.complication_id is None for t in transcripts)
+
+
+# The persona batch's instructions as they were before the matrix: `v0` ran with them.
+PERSONA_BATCH_PROMPT_TAIL = (
+    "- Quando a conversa terminar (você fechou, desistiu ou se despediu), "
+    f"termine a sua mensagem com {END_MARKER}."
+)
+
+
+def test_persona_batch_prompt_is_unchanged() -> None:
+    prompt = build_system_prompt(PERSONA, GOAL)
+    assert prompt.endswith(PERSONA_BATCH_PROMPT_TAIL)
+    assert MATRIX_END_RULE not in prompt
+
+
+def test_matrix_prompt_answers_before_ending() -> None:
+    prompt = build_system_prompt(PERSONA, GOAL, matrix=True)
+    assert prompt.endswith(MATRIX_END_RULE)
+    assert "responda" in MATRIX_END_RULE
+    assert "resolvido" in MATRIX_END_RULE and "desistido" in MATRIX_END_RULE
+
+
+async def test_matrix_conversation_gets_the_end_rule(tmp_path: Path) -> None:
+    model = ScriptedModel([f"oi {END_MARKER}"])
+    await run_matrix(
+        settings(),
+        model,
+        plan_matrix()[:1],
+        runs_dir=tmp_path,
+        transport=httpx2.MockTransport(replies_ok),
+    )
+    assert MATRIX_END_RULE in str(model.calls[0][0].content)

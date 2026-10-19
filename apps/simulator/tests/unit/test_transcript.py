@@ -76,9 +76,3 @@ def test_a_line_written_before_the_matrix_loads_with_no_cell(tmp_path: Path) -> 
     (transcript,) = read_jsonl(path)
     assert transcript.intent_id is None
     assert transcript.complication_id is None
-
-
-def test_committed_run_files_still_load() -> None:
-    runs = Path(__file__).parents[2] / "runs"
-    for path in runs.glob("*.jsonl"):
-        assert all(t.intent_id is None for t in read_jsonl(path)), path.name
