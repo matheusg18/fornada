@@ -14,9 +14,9 @@
 
 ## 3. Simulator: content on the client span
 
-- [ ] 3.1 Add `capture_content` to the simulator's `TelemetrySettings` (pydantic, `TELEMETRY__CAPTURE_CONTENT`), off by default; verify with a settings unit test
-- [ ] 3.2 Set the same two attributes on the simulator's client span when capture is on; verify with unit tests mirroring 2.2, plus one asserting the persona's goal text never appears in any attribute with capture on
-- [ ] 3.3 Run `uv run task check` in `apps/chat` and `apps/simulator` and verify both pass
+- [x] 3.1 Add `capture_content` to the simulator's `TelemetrySettings` (pydantic, `TELEMETRY__CAPTURE_CONTENT`), off by default; verify with a settings unit test
+- [x] 3.2 Set the same two attributes on the simulator's client span when capture is on; verify with unit tests mirroring 2.2, plus one asserting the persona's goal text never appears in any attribute with capture on
+- [x] 3.3 Run `uv run task check` in `apps/chat` and `apps/simulator` and verify both pass
 
 ## 4. Docs and end-to-end check
 

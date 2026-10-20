@@ -4,7 +4,8 @@ it for the process, flush it after a batch and shut it down at exit.
 Mirrors the API's `core/telemetry.py`. `build_tracer_provider` has no global
 side effects, so tests inject an in-memory exporter. Spans come from
 `trace.get_tracer(...)` in `client.py`: a proxy until `setup_tracing`
-registers the SDK provider, a no-op when tracing is off.
+registers the SDK provider, a no-op when tracing is off. `setup_tracing` also
+hands the client the content-capture switch.
 """
 
 from opentelemetry import trace
@@ -14,6 +15,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter
 from opentelemetry.sdk.trace.sampling import ALWAYS_ON, ParentBased
 
+from fornada_simulator.client import use_content_capture
 from fornada_simulator.settings import TelemetrySettings
 
 SERVICE_NAME = "fornada-simulator"
@@ -53,6 +55,7 @@ def setup_tracing(settings: TelemetrySettings) -> TracerProvider | None:
     """
     if not settings.enabled:
         return None
+    use_content_capture(settings.capture_content)
     current = trace.get_tracer_provider()
     if isinstance(current, TracerProvider):
         return current

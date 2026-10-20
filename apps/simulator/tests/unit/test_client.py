@@ -183,6 +183,62 @@ async def test_span_carries_no_message_text(spans: InMemorySpanExporter) -> None
     values = " ".join(str(v) for v in attrs(span).values())
     assert "81987654321" not in values
     assert "Olá!" not in values
+    assert "gen_ai.input.messages" not in attrs(span)
+    assert "gen_ai.output.messages" not in attrs(span)
+
+
+@pytest.fixture
+def capturing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Content capture on, as `setup_tracing` sets it."""
+    monkeypatch.setattr(client, "_capture_content", True)
+
+
+def messages(span: ReadableSpan, key: str) -> list[dict[str, Any]]:
+    return json.loads(attrs(span)[key])
+
+
+@pytest.mark.usefixtures("capturing")
+async def test_capture_puts_the_message_and_replies_on_the_span(
+    spans: InMemorySpanExporter,
+) -> None:
+    def two_replies(request: httpx2.Request) -> httpx2.Response:
+        body = {"replies": [{"text": "Oi! Vou ver o catálogo."}, {"text": "Temos chocolate."}]}
+        return httpx2.Response(200, json=body)
+
+    async with make_client(httpx2.MockTransport(two_replies)) as http:
+        await send_message(http, uuid4(), "Oi", persona_id="apressada")
+
+    (span,) = client_spans(spans)
+    assert messages(span, "gen_ai.input.messages") == [
+        {"role": "user", "parts": [{"type": "text", "content": "Oi"}]}
+    ]
+    assert messages(span, "gen_ai.output.messages") == [
+        {"role": "assistant", "parts": [{"type": "text", "content": "Oi! Vou ver o catálogo."}]},
+        {"role": "assistant", "parts": [{"type": "text", "content": "Temos chocolate."}]},
+    ]
+
+
+@pytest.mark.usefixtures("capturing")
+async def test_capture_keeps_the_input_of_a_failed_post(spans: InMemorySpanExporter) -> None:
+    def timeout(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ReadTimeout("slow")
+
+    async with make_client(httpx2.MockTransport(timeout)) as http:
+        with pytest.raises(ApiError):
+            await send_message(http, uuid4(), "Oi")
+
+    (span,) = client_spans(spans)
+    assert messages(span, "gen_ai.input.messages")[0]["parts"][0]["content"] == "Oi"
+    assert "gen_ai.output.messages" not in attrs(span)
+
+
+@pytest.mark.usefixtures("capturing")
+async def test_capture_keeps_accents(spans: InMemorySpanExporter) -> None:
+    async with make_client(httpx2.MockTransport(ok)) as http:
+        await send_message(http, uuid4(), "Olá, é possível?")
+
+    (span,) = client_spans(spans)
+    assert "Olá, é possível?" in attrs(span)["gen_ai.input.messages"]
 
 
 async def test_500_marks_the_span_as_an_error(spans: InMemorySpanExporter) -> None:

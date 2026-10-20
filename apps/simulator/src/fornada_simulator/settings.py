@@ -82,6 +82,16 @@ class TelemetrySettings(BaseModel):
     # Base URL of the Collector's OTLP/HTTP receiver; the telemetry setup
     # appends the signal path (`/v1/traces`).
     otlp_endpoint: str = "http://edot-collector:4318"
+    # The customer message and the replies on the client span, the API's
+    # switch. Off by default; the Collector strips them before Elasticsearch,
+    # not before Langfuse. Never on while tracing is off.
+    capture_content: bool = False
+
+    @model_validator(mode="after")
+    def _capture_needs_tracing(self) -> Self:
+        if not self.enabled:
+            self.capture_content = False
+        return self
 
     @field_validator("otlp_endpoint")
     @classmethod

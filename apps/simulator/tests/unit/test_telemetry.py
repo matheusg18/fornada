@@ -1,10 +1,12 @@
 """The simulator's trace pipeline (`client-tracing` spec)."""
 
+import pytest
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import TraceFlags
 
+from fornada_simulator import client
 from fornada_simulator.settings import TelemetrySettings
 from fornada_simulator.telemetry import build_tracer_provider, setup_tracing, traces_url
 
@@ -49,6 +51,14 @@ def test_disabled_tracing_registers_nothing() -> None:
     before = trace.get_tracer_provider()
     assert setup_tracing(TelemetrySettings(enabled=False)) is None
     assert trace.get_tracer_provider() is before
+
+
+def test_setup_hands_the_client_the_capture_switch(
+    session_exporter: InMemorySpanExporter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(client, "_capture_content", False)
+    setup_tracing(TelemetrySettings(enabled=True, capture_content=True))
+    assert client._capture_content is True
 
 
 def test_setup_reuses_the_registered_provider(session_exporter: InMemorySpanExporter) -> None:

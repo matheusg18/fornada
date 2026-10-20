@@ -11,7 +11,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import SpanKind
 
-from fornada_simulator import simulate
+from fornada_simulator import client, simulate
 from fornada_simulator.personas import PERSONAS
 from fornada_simulator.scenarios import plan_matrix
 from fornada_simulator.settings import SimulatorSettings
@@ -65,8 +65,8 @@ def api(
         seen.append(request)
         return (handler or default)(request)
 
-    client = httpx2.AsyncClient(base_url="http://api", transport=httpx2.MockTransport(respond))
-    return client, seen
+    http = httpx2.AsyncClient(base_url="http://api", transport=httpx2.MockTransport(respond))
+    return http, seen
 
 
 async def test_first_message_is_posted_under_a_new_uuid4() -> None:
@@ -260,6 +260,23 @@ class TwoTurnModel:
     async def ainvoke(self, input: list[BaseMessage], /) -> BaseMessage:
         await asyncio.sleep(0)
         return AIMessage("oi" if len(input) < 4 else f"tchau {END_MARKER}")
+
+
+async def test_capture_never_exports_the_persona_goal(
+    spans: InMemorySpanExporter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(client, "_capture_content", True)
+    http, _ = api()
+    async with http:
+        await run_conversation(
+            PERSONA, GOAL, http, ScriptedModel(["oi", END_MARKER]), max_turns=5, run_id="r"
+        )
+
+    found = [s for s in spans.get_finished_spans() if s.kind is SpanKind.CLIENT]
+    assert found
+    for span in found:
+        assert "gen_ai.input.messages" in (span.attributes or {})
+        assert all(GOAL not in str(value) for value in (span.attributes or {}).values())
 
 
 async def test_concurrent_conversations_keep_their_own_traces(
