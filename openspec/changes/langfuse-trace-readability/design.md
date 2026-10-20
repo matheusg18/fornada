@@ -62,14 +62,14 @@ The chat and the simulator read `TELEMETRY__CAPTURE_CONTENT` the way each alread
 
 ### 5. Reading a session
 
-The API also puts `session.id` on its GenAI spans (`agent-tracing`), so the session page still lists `invoke_agent` and the `chat` observations under each turn. The readable view is the session page filtered to **Is Root Observation = true**: one block per turn with the customer's message and the bot's replies. `AGENTS.md` documents it, together with the trace page's "Min Level". `session.id` stays on every span, as Langfuse's v4 docs recommend for filtering observations by session.
+The API also puts `session.id` on its GenAI spans (`agent-tracing`), so the session page still lists `invoke_agent` and the `chat` observations under each turn. The readable view is the session page filtered to **Type any of SPAN, TOOL**: the page lists only observations with `session.id`, so the only SPANs are the turn roots, and each turn shows as its message and replies followed by its tool calls (checked on a real session during apply; **Is Root Observation = true** gives the conversation alone, without the tools). `AGENTS.md` documents it, together with the trace page's "Min Level". `session.id` stays on every span, as Langfuse's v4 docs recommend for filtering observations by session.
 
 ## Risks / Trade-offs
 
 - [Langfuse may change how it renders hidden `DEBUG` spans] → The probe is recorded above; the verification task repeats it on a real turn. If a later version hides whole subtrees, removing one processor restores today's view.
 - [Conversation text in two more processes] → Only with capture on, only to the Collector, and only Langfuse receives it, which already holds the same text from the API. The LGPD map (phase 7) lists the clients as sources.
 - [A span the app should show gets hidden because it lacks `gen_ai.operation.name`] → Every span the agent instrumentation creates has it today (`agent-tracing`). A new kind of span added later would land at `DEBUG` and show under "Show all"; the spec scenario on the agent's visibility catches a regression.
-- [Root output missing when a turn fails] → Intended: a failed post keeps the input only, so filtering the session by "has output" would hide failed turns. `AGENTS.md` says to filter by root, not by output.
+- [Root output missing when a turn fails] → Intended: a failed post keeps the input only, so filtering the session by "has output" would hide failed turns. `AGENTS.md` says to filter by type, not by output.
 
 ## Migration Plan
 
