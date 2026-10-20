@@ -20,8 +20,8 @@
 
 ## 4. Docs and end-to-end check
 
-- [ ] 4.1 Update `.env.example` so `TELEMETRY__CAPTURE_CONTENT` says it applies to the API, the chat and the simulator; update `AGENTS.md` (the Collector and redaction bullets, plus a short "Reading a conversation in Langfuse" note: session page filtered by **Is Root Observation = true**, the trace page's "Min Level", and why not to filter by output); verify the documented filter on a real session
-- [ ] 4.2 Run a short simulator batch with capture on and verify: the session page filtered to root observations shows one block per turn with the customer's message and the bot's replies; `GET traces-*/_search` with a phone used in the conversation returns 0 hits in Elasticsearch
+- [x] 4.1 Update `.env.example` so `TELEMETRY__CAPTURE_CONTENT` says it applies to the API, the chat and the simulator; update `AGENTS.md` (the Collector and redaction bullets, plus a short "Reading a conversation in Langfuse" note: session page filtered by **Is Root Observation = true**, the trace page's "Min Level", and why not to filter by output); verify the documented filter on a real session
+- [x] 4.2 Run a short simulator batch with capture on and verify: the session page filtered to root observations shows one block per turn with the customer's message and the bot's replies; `GET traces-*/_search` with a phone used in the conversation returns 0 hits in Elasticsearch
 
 ## Workflow follow-up
 
