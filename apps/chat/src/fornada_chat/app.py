@@ -26,9 +26,10 @@ CONVERSATION_ID_KEY = "conversation_id"
 def start_tracing() -> None:
     # Before any message. The provider stays private to the chat, so
     # Chainlit's own FastAPI server makes no spans (telemetry.py).
-    provider = setup_tracing(load_telemetry_settings(os.environ))
+    settings = load_telemetry_settings(os.environ)
+    provider = setup_tracing(settings)
     if provider is not None:
-        use_tracer_provider(provider)
+        use_tracer_provider(provider, capture_content=settings.capture_content)
 
 
 @cl.on_app_shutdown

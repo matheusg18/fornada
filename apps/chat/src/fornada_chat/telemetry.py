@@ -34,16 +34,28 @@ class TelemetrySettings:
     enabled: bool = False
     # Base URL of the Collector's OTLP/HTTP receiver.
     otlp_endpoint: str = DEFAULT_OTLP_ENDPOINT
+    # The customer message and the replies on the client span, the API's
+    # switch. Off by default; the Collector strips them before Elasticsearch,
+    # not before Langfuse. Never on while tracing is off.
+    capture_content: bool = False
 
 
 def load_telemetry_settings(environ: Mapping[str, str]) -> TelemetrySettings:
-    """`TELEMETRY__ENABLED` and `TELEMETRY__OTLP_ENDPOINT`, as the API reads them."""
-    enabled = environ.get("TELEMETRY__ENABLED", "").strip().lower() in TRUE_VALUES
+    """`TELEMETRY__ENABLED`, `TELEMETRY__OTLP_ENDPOINT` and
+    `TELEMETRY__CAPTURE_CONTENT`, as the API reads them."""
+    enabled = _is_true(environ, "TELEMETRY__ENABLED")
+    capture_content = enabled and _is_true(environ, "TELEMETRY__CAPTURE_CONTENT")
     url = environ.get("TELEMETRY__OTLP_ENDPOINT") or DEFAULT_OTLP_ENDPOINT
     parts = urlsplit(url)
     if parts.scheme not in ("http", "https") or not parts.hostname:
         raise ValueError("TELEMETRY__OTLP_ENDPOINT: must be an http(s) URL (http://host:4318)")
-    return TelemetrySettings(enabled=enabled, otlp_endpoint=url.rstrip("/"))
+    return TelemetrySettings(
+        enabled=enabled, otlp_endpoint=url.rstrip("/"), capture_content=capture_content
+    )
+
+
+def _is_true(environ: Mapping[str, str], name: str) -> bool:
+    return environ.get(name, "").strip().lower() in TRUE_VALUES
 
 
 def traces_url(settings: TelemetrySettings) -> str:

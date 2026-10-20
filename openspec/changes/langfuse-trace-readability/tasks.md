@@ -9,8 +9,8 @@
 
 ## 2. Chat: content on the client span
 
-- [ ] 2.1 Add `capture_content` to the chat's `TelemetrySettings`, read from `TELEMETRY__CAPTURE_CONTENT` with the same truthy values as `TELEMETRY__ENABLED`, off by default; verify with unit tests for unset, true and tracing off
-- [ ] 2.2 With capture on, set `gen_ai.input.messages` on the client span before the post and `gen_ai.output.messages` after the replies are read, in the API's JSON shape with `ensure_ascii=False`; verify with unit tests for two replies in order, a failed post keeping the input only, accents kept, and the existing "no message text" test still passing with capture off
+- [x] 2.1 Add `capture_content` to the chat's `TelemetrySettings`, read from `TELEMETRY__CAPTURE_CONTENT` with the same truthy values as `TELEMETRY__ENABLED`, off by default; verify with unit tests for unset, true and tracing off
+- [x] 2.2 With capture on, set `gen_ai.input.messages` on the client span before the post and `gen_ai.output.messages` after the replies are read, in the API's JSON shape with `ensure_ascii=False`; verify with unit tests for two replies in order, a failed post keeping the input only, accents kept, and the existing "no message text" test still passing with capture off
 
 ## 3. Simulator: content on the client span
 
