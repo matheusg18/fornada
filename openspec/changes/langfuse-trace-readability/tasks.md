@@ -4,8 +4,8 @@
 
 - [x] 1.1 Check the OTTL paths in design.md decision 1 (`span.parent_span_id`, `span.status.code`, `span.name`) against the transform processor docs for EDOT 9.5.5 / Collector core v0.161.0, and record the result in the processor's comment
 - [x] 1.2 Add `transform/langfuse_view` to `.devcontainer/otel-collector/config.yaml` (DEBUG level on non-root, non-GenAI, non-error spans; root of `/conversations/{conversation_id}/messages` renamed `turn`; `error_mode: ignore`) and wire it into `traces/langfuse` only, updating the header and pipeline comments; verify the Collector starts cleanly after the maintainer restarts it on the host (`docker compose -p fornada_devcontainer logs edot-collector` shows no config error)
-- [ ] 1.3 Send a chat turn with tracing on and verify in Langfuse that the trace is named `turn` and its default tree shows `turn` → `invoke_agent` → `chat` / tool observations, with the hidden-observations note; verify in Kibana Dev Tools (`GET traces-*/_search` by trace id) that the same spans keep their HTTP names and carry no `langfuse.observation.level`
-- [ ] 1.4 Verify the smoke test (`telemetrygen`) traces keep their names in Langfuse, and that a failed tool statement's span stays at `DEFAULT` (force one, e.g. against a stopped database or a broken statement in a scratch run, and read its level with the observations API)
+- [x] 1.3 Send a chat turn with tracing on and verify in Langfuse that the trace is named `turn` and its default tree shows `turn` → `invoke_agent` → `chat` / tool observations, with the hidden-observations note; verify in Kibana Dev Tools (`GET traces-*/_search` by trace id) that the same spans keep their HTTP names and carry no `langfuse.observation.level`
+- [x] 1.4 Verify the smoke test (`telemetrygen`) traces keep their names in Langfuse, and that a failed tool statement's span is not marked `DEBUG` (Langfuse shows status ERROR as `ERROR` level) (force one, e.g. against a stopped database or a broken statement in a scratch run, and read its level with the observations API)
 
 ## 2. Chat: content on the client span
 

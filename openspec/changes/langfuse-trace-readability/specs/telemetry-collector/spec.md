@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Langfuse shows infrastructure spans at DEBUG level
-Before export to Langfuse, the Collector SHALL set Langfuse's observation level to `DEBUG` on every span that has a parent, has no `gen_ai.operation.name` and does not have status ERROR. Other spans SHALL keep the default level. Spans exported to Elasticsearch SHALL NOT carry the level attribute.
+Before export to Langfuse, the Collector SHALL set Langfuse's observation level to `DEBUG` on every span that has a parent, has no `gen_ai.operation.name` and does not have status ERROR. Other spans SHALL keep the level Langfuse assigns them (`DEFAULT`, or `ERROR` for a span with status ERROR). Spans exported to Elasticsearch SHALL NOT carry the level attribute.
 
 #### Scenario: SQL span hidden by default
 - **WHEN** a traced turn runs a tool that queries the database
@@ -19,7 +19,7 @@ Before export to Langfuse, the Collector SHALL set Langfuse's observation level 
 
 #### Scenario: Failed infrastructure span stays visible
 - **WHEN** a tool's SQL statement fails and its span has status ERROR
-- **THEN** that span keeps the `DEFAULT` level in Langfuse and shows in the default tree
+- **THEN** that span is not marked `DEBUG`: Langfuse shows it at `ERROR` level, in the default tree
 
 #### Scenario: Elasticsearch unchanged
 - **WHEN** the same trace is read in Elasticsearch
