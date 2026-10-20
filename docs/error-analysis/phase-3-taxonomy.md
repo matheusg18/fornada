@@ -1,13 +1,13 @@
 # Phase 3 failure taxonomy (`v0`)
 
-Run `20261019T174148-f3ac` (`apps/simulator/runs/`): the 125-cell persona × intent × complication matrix, 8 turns max, run day 2026-10-19. The seed fills days +3 and +4 (10-22 and 10-23).
+Run `20261019T174148-f3ac`: the 125-cell persona × intent × complication matrix, 8 turns max, run day 2026-10-19. The seed fills days +3 and +4 (10-22 and 10-23).
 
 There are two sources of annotation:
 
 - **LLM:** Claude read all 125 conversations, with their tool calls interleaved, and wrote one open code per conversation. The codes are in [phase-3-open-codes.md](phase-3-open-codes.md). It then did the axial coding below. Counts marked *tool* come from the Langfuse observations (tool arguments and results). Counts marked *manual* come from that single reading, so they have a margin.
 - **Maintainer:** read a sample of conversations and wrote general notes plus notes on #3 and #4. The LLM consolidation was written before reading these notes, so the two are independent. They are merged below, and each finding names its source.
 
-Conversations are referred to by their number in the open codes file, which also gives each one's Langfuse session id.
+Conversations are referred to by their number in the open codes file, which also gives each one's Langfuse session id. The run file (`apps/simulator/runs/`) is not committed, and the session ids resolve only in the maintainer's local Langfuse, so outside that environment the conversations themselves are not available; the codes and counts here are the record.
 
 ## 1. First error per conversation (n = 125, LLM)
 

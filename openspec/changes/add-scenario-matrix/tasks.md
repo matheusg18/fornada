@@ -32,5 +32,5 @@
 
 ## Workflow follow-up
 
-- Commit the run file `apps/simulator/runs/<run_id>.jsonl` (simulated, fictional data) as the phase 3 dataset.
+- The run file `apps/simulator/runs/20261019T174148-f3ac.jsonl` is not committed (the maintainer's decision); the phase 3 annotations in `docs/error-analysis/` cite its conversations by Langfuse session id.
 - Archive the change after review.
