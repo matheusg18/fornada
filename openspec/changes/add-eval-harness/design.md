@@ -211,9 +211,18 @@ Sketch of one predicate, as it will appear under its marker:
 
 The suite runs the agent with the provider's default temperature, as the API does. The roadmap's advice to "fix temperature and seeds where possible" is honored by measuring first: the baseline runs twice, and the variance section shows how unstable the gate would be.
 
-If the flip share is high, a separate change adds a temperature setting to `app-config`, used by the API and the suite alike, so the gate never tests a configuration that does not ship. Anthropic's API has no sampling seed.
+**Decided by the maintainer: no temperature setting, in the suite or the API.**
+- Reasoning models no longer accept the parameter: OpenAI's reasoning models such as `gpt-5-mini` reject it, and Anthropic fixes it while extended thinking is on.
+- Neither provider offers a sampling seed.
 
-*Alternative:* temperature 0 in the suite only. Rejected: the gate would pass a configuration customers never talk to.
+Variance is therefore handled by the gate's design, not by sampling settings:
+- pass^3 on critical cases;
+- a minimum rate on non-critical cases;
+- the variance section of the report, which shows how often the same commit flips.
+
+A high flip share is fixed in the dataset (ambiguous turns) or in the agent, never by pinning sampling.
+
+*Alternative:* temperature 0 in the suite only. Rejected: it would not work on reasoning models, and the gate would pass a configuration customers never talk to.
 
 ### 10. Keeping DeepEval out of the other apps' way
 
