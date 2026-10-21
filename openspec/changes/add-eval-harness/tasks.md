@@ -4,9 +4,9 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 4: the deterministic asser
 
 ## 1. App scaffold and dependency
 
-- [ ] 1.1 Create `apps/evals` with `uv init --package apps/evals` (package `fornada-evals`, module `fornada_evals`). Copy the ruff, pyright, pytest and taskipy config from `apps/simulator`, and add tasks `test`, `test:unit`, `lint`, `format`, `typecheck` and `check` (no paid suite in `check`). Add `fornada-api` as a workspace dependency. Verify `uv sync` at the root succeeds and `uv run task check` passes in `apps/evals` with an empty test.
-- [ ] 1.2 Check the latest `deepeval` release on PyPI and install it with `uv add --package fornada-evals deepeval`. Gitignore `.deepeval/` and `apps/evals/reports/`. Verify `uv run --package fornada-evals python -c "import deepeval"` works with `DEEPEVAL_TELEMETRY_OPT_OUT=1`.
-- [ ] 1.3 Run `uv run task check` in `apps/api`, `apps/chat` and `apps/simulator`, and compare the test counts with before the install (442, 48, 99). If a DeepEval-installed plugin changes a result or adds warnings, disable it with `-p no:<plugin>` in that app's `addopts` and note why in a comment (design.md, decision 10). Verify all three pass with the same counts.
+- [x] 1.1 Create `apps/evals` with `uv init --package apps/evals` (package `fornada-evals`, module `fornada_evals`). Copy the ruff, pyright, pytest and taskipy config from `apps/simulator`, and add tasks `test`, `test:unit`, `lint`, `format`, `typecheck` and `check` (no paid suite in `check`). Add `fornada-api` as a workspace dependency. Verify `uv sync` at the root succeeds and `uv run task check` passes in `apps/evals` with an empty test.
+- [x] 1.2 Check the latest `deepeval` release on PyPI and install it with `uv add --package fornada-evals deepeval`. Gitignore `.deepeval/` and `apps/evals/reports/`. Verify `uv run --package fornada-evals python -c "import deepeval"` works with `DEEPEVAL_TELEMETRY_OPT_OUT=1`.
+- [x] 1.3 Run `uv run task check` in `apps/api`, `apps/chat` and `apps/simulator`, and compare the test counts with before the install (442, 48, 99). If a DeepEval-installed plugin changes a result or adds warnings, disable it with `-p no:<plugin>` in that app's `addopts` and note why in a comment (design.md, decision 10). Verify all three pass with the same counts.
 
 ## 2. Dataset format and date rendering
 
