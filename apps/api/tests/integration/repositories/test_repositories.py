@@ -3,7 +3,6 @@
 import datetime as dt
 from collections.abc import AsyncIterator
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 
 import pytest
 from sqlalchemy import func, select
@@ -19,11 +18,10 @@ from fornada_api.repositories import (
     SideEffectRepository,
 )
 from fornada_api.services import ports
-from fornada_api.services.clock import SystemClock
+from tests.integration.conftest import SEED_DAY
 
 pytestmark = pytest.mark.anyio
 
-RUN_DAY = SystemClock(ZoneInfo("America/Sao_Paulo")).today()
 DAY = dt.timedelta(days=1)
 
 
@@ -82,21 +80,28 @@ async def test_used_kg_on_the_full_day(db: AsyncSession, full_day: dt.date) -> N
     assert await CapacityRepository(db).used_kg(full_day) == Decimal("15.0")
 
 
+async def test_seed_is_pinned_to_the_seed_day(db: AsyncSession) -> None:
+    repo = CapacityRepository(db)
+    assert await repo.used_kg(SEED_DAY + 3 * DAY) == Decimal("15.0")
+    assert await repo.used_kg(SEED_DAY + 4 * DAY) == Decimal("15.0")
+    assert await repo.used_kg(SEED_DAY + 5 * DAY) == Decimal("13.0")
+
+
 async def test_used_kg_matches_sql(db: AsyncSession) -> None:
     repo = CapacityRepository(db)
     for offset in range(-5, 15):
-        day = RUN_DAY + offset * DAY
+        day = SEED_DAY + offset * DAY
         expected = await db.scalar(
             select(func.coalesce(func.sum(Order.weight_kg), 0)).where(
                 Order.delivery_date == day, Order.status != "cancelled"
             )
         )
         assert await repo.used_kg(day) == expected
-    assert await repo.used_kg(RUN_DAY + 400 * DAY) == Decimal(0)
+    assert await repo.used_kg(SEED_DAY + 400 * DAY) == Decimal(0)
 
 
 async def test_christmas_override(db: AsyncSession) -> None:
-    override = await CapacityRepository(db).get_override(dt.date(RUN_DAY.year, 12, 25))
+    override = await CapacityRepository(db).get_override(dt.date(SEED_DAY.year, 12, 25))
     assert override is not None
     assert override.capacity_kg == Decimal("0.0")
 

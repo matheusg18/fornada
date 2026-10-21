@@ -2,7 +2,7 @@
 # (app + Langfuse databases), a self-hosted Langfuse v4 stack, the EDOT
 # Collector (plus `telemetrygen`, an on-demand smoke test for it), and
 # Elasticsearch and Kibana (plus `elasticsearch-setup`, a one-shot that sets
-# Kibana's service user password).
+# Kibana's service user password), and `postgres-test`, a throwaway PostgreSQL for tests.
 #
 # Secrets for this environment live in `.devcontainer/.env`, which Compose loads
 # automatically from this folder (template: `.devcontainer/.env.example`; the
@@ -18,8 +18,8 @@
 # and elasticsearch, elasticsearch-setup, kibana and edot-collector on the same
 # Elastic version.
 #
-# Only elasticsearch (1.5 GiB) and kibana (1 GiB) have memory limits, with no
-# swap.
+# Only elasticsearch (1.5 GiB), kibana (1 GiB) and postgres-test (512 MiB, tmpfs)
+# have memory limits; the Elastic two have no swap.
 
 x-langfuse-env: &langfuse-env
   NEXTAUTH_URL: http://localhost:3000
@@ -79,8 +79,12 @@ services:
     environment:
       # Only what the agent needs. Langfuse and infra secrets stay out of here.
       DATABASE_URI: postgresql://fornada:${FORNADA_DB_PASSWORD:?}@postgres:5432/fornada
+      # Test-only database (tmpfs, emptied on every start); the API's integration tests use it.
+      TEST_DATABASE_URI: postgresql://fornada_test:${FORNADA_TEST_DB_PASSWORD:?}@postgres-test:5432/fornada_test
     depends_on:
       postgres:
+        condition: service_healthy
+      postgres-test:
         condition: service_healthy
 
   postgres:
@@ -104,6 +108,34 @@ services:
       - ./db:/fornada-db:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  postgres-test:
+    # Same image and tag as `postgres` (Dependabot bumps both). Data lives on tmpfs, so
+    # every start runs initdb and the init script again: a restart is a full reset.
+    image: docker.io/postgres:18.6-trixie
+    restart: unless-stopped
+    # Durability off: a crash loses only test data.
+    command: ["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_TEST_PASSWORD:?}
+      FORNADA_TEST_DB_PASSWORD: ${FORNADA_TEST_DB_PASSWORD:?}
+      TZ: UTC
+      PGTZ: UTC
+    tmpfs:
+      # Postgres 18+ images keep data under a versioned subdirectory of this path.
+      - /var/lib/postgresql
+    volumes:
+      - ./postgres-test/init-test-database.sh:/docker-entrypoint-initdb.d/init-test-database.sh:ro
+    # tmpfs pages count against this limit; the seeded database is a few MB.
+    mem_limit: 512m
+    healthcheck:
+      # TCP, not the socket: during init the entrypoint's temporary server listens
+      # on the socket only, so the socket would report ready before the role exists.
+      test: ["CMD-SHELL", "pg_isready -U postgres -h localhost"]
       interval: 3s
       timeout: 3s
       retries: 10
