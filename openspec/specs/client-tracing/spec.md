@@ -65,7 +65,7 @@ Each client span SHALL carry the conversation id as `session.id` and as `gen_ai.
 - **THEN** the client span has `session.id` and `gen_ai.conversation.id` equal to that id
 
 ### Requirement: Simulator spans name the persona and batch
-Each simulator client span SHALL carry the persona's identifier as `fornada.simulator.persona.id` and the batch run id as `fornada.simulator.run.id`. These attributes SHALL stay on the client span: the API SHALL put neither on any span it exports, and SHALL NOT read the run id from the request.
+Each simulator client span SHALL carry the persona's identifier as `fornada.simulator.persona.id` and the batch run id as `fornada.simulator.run.id`. A client span of a matrix conversation SHALL also carry the cell's intent as `fornada.simulator.intent.id` and its complication as `fornada.simulator.complication.id`; a persona batch span SHALL carry neither. These attributes SHALL stay on the client span: the API SHALL put none of them on any span it exports, and SHALL NOT read the run id, the intent or the complication from the request.
 
 #### Scenario: Persona on the client span
 - **WHEN** the simulator plays persona `apressada` in run `20261012T120000-ab12`
@@ -74,6 +74,14 @@ Each simulator client span SHALL carry the persona's identifier as `fornada.simu
 #### Scenario: Persona stays at the client
 - **WHEN** the simulator posts a message for persona `apressada`
 - **THEN** no span exported by the API carries `fornada.simulator.persona.id`
+
+#### Scenario: Cell on the client span
+- **WHEN** the simulator plays matrix cell (`indecisa`, `entrega`, `troca_sabor`)
+- **THEN** every client span of that conversation has `fornada.simulator.intent.id` = `entrega` and `fornada.simulator.complication.id` = `troca_sabor`
+
+#### Scenario: Cell stays at the client
+- **WHEN** the simulator posts a message for a matrix cell
+- **THEN** no span exported by the API carries `fornada.simulator.intent.id` or `fornada.simulator.complication.id`, and the request's `baggage` header carries only the persona
 
 ### Requirement: Failed posts mark the client span as an error
 When a post fails on connection or timeout, the API answers with a non-200 status, or a 200 body cannot be read as replies, the client span SHALL have status ERROR and `error.type` set to the failure kind, with no status description. A successful post SHALL leave the status UNSET.
@@ -85,13 +93,6 @@ When a post fails on connection or timeout, the API answers with a non-200 statu
 #### Scenario: API unreachable
 - **WHEN** the chat posts a message and the API cannot be reached
 - **THEN** the client span has status ERROR and `error.type` names the transport failure
-
-### Requirement: Client spans carry no conversation content
-Client spans SHALL NOT carry the customer's message text, the replies or the persona's goal text.
-
-#### Scenario: Phone number in a message
-- **WHEN** the simulator posts a message containing a phone number
-- **THEN** no attribute of the client span contains the message text or the phone number
 
 ### Requirement: The persona's own model calls are not traced
 The simulator SHALL NOT produce spans for the LLM calls that generate the persona's messages, so the cost of a session in Langfuse is the agent's cost only.
@@ -136,3 +137,40 @@ With tracing enabled, each message the simulator posts SHALL carry a W3C `baggag
 #### Scenario: Tracing off
 - **WHEN** the simulator runs with `TELEMETRY__ENABLED` unset
 - **THEN** the API receives no `baggage` header
+
+### Requirement: Clients read the content-capture switch
+The chat and the simulator SHALL read `TELEMETRY__CAPTURE_CONTENT`, the same switch the API reads. Capture SHALL be off by default, and it SHALL have no effect while tracing is off.
+
+#### Scenario: Capture unset
+- **WHEN** the simulator runs with `TELEMETRY__ENABLED=true` and `TELEMETRY__CAPTURE_CONTENT` unset
+- **THEN** its client spans are exported without any conversation content
+
+#### Scenario: Capture on, tracing off
+- **WHEN** the chat runs with `TELEMETRY__CAPTURE_CONTENT=true` and `TELEMETRY__ENABLED` unset
+- **THEN** no span is exported
+
+### Requirement: Client spans carry no conversation content while capture is off
+With content capture off, client spans SHALL NOT carry the customer's message text or the replies. Client spans SHALL NOT carry the persona's goal text, whatever the switch.
+
+#### Scenario: Phone number in a message
+- **WHEN** capture is off and the simulator posts a message containing a phone number
+- **THEN** no attribute of the client span contains the message text or the phone number
+
+#### Scenario: Persona goal never exported
+- **WHEN** capture is on and the simulator posts a message for a persona with a goal
+- **THEN** no attribute of the client span contains the goal text
+
+### Requirement: Client spans carry the turn's message and replies when capture is on
+With content capture on, each client span SHALL carry `gen_ai.input.messages` with the customer message it posted, as one `user` message, and, when replies arrive, `gen_ai.output.messages` with them as `assistant` messages in order. Both SHALL use the GenAI semconv JSON message shape the API's turn spans use.
+
+#### Scenario: One message, two replies
+- **WHEN** capture is on, the chat posts "Oi" and the API returns two replies
+- **THEN** the client span's `gen_ai.input.messages` holds one user message "Oi", and its `gen_ai.output.messages` holds the two replies in order
+
+#### Scenario: Failed post keeps the input only
+- **WHEN** capture is on and the simulator's post times out
+- **THEN** the client span carries `gen_ai.input.messages` with the message and no `gen_ai.output.messages`
+
+#### Scenario: Accents are kept
+- **WHEN** capture is on and the customer writes "Olá, é possível?"
+- **THEN** `gen_ai.input.messages` holds that text as written, not as `\u` escapes
