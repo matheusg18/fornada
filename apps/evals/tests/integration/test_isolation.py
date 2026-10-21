@@ -14,6 +14,8 @@ from fornada_evals.isolation import isolated_database, sweep
 pytestmark = pytest.mark.anyio
 
 DAILY_CAPACITY_KG = Decimal(15)
+# The Monday the seed is pinned to (design.md, decision 3); day +3 is full.
+SEED_DAY = dt.date(2026, 3, 9)
 
 
 async def capacity(
@@ -49,8 +51,12 @@ def schemas(database_url: str) -> set[str]:
     return {row[0] for row in rows}
 
 
-def public_orders(database_url: str) -> int:
+def public_orders(database_url: str) -> int | None:
+    """Orders in `public`, or None when it has no `orders` table (the API's tests create it)."""
     with psycopg.connect(database_url) as conn:
+        row = conn.execute("SELECT to_regclass('public.orders')").fetchone()
+        if not row or row[0] is None:
+            return None
         row = conn.execute("SELECT count(*) FROM public.orders").fetchone()
     assert row
     return row[0]
@@ -109,8 +115,6 @@ async def test_sweep_drops_leftover_schemas(database_url: str) -> None:
 
 async def test_run_day_is_the_seed_day(database_url: str) -> None:
     async with isolated_database(database_url) as db:
-        with psycopg.connect(database_url) as conn:
-            row = conn.execute("SELECT (now() AT TIME ZONE 'America/Sao_Paulo')::date").fetchone()
-
-        assert row
-        assert db.run_day == row[0]
+        assert db.run_day == SEED_DAY
+        full_day = await capacity(db.sessionmaker, db.run_day, SEED_DAY + dt.timedelta(3))
+        assert full_day.free_kg == 0
