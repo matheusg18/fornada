@@ -73,11 +73,16 @@ apps/evals/
 
 This is the documented path for multi-turn, tool-using agents without tracing.
 
+**For the judge changes:**
+- When layer 3 needs DeepEval's trajectory metrics, for example `TaskCompletionMetric` for the final dashboard's task success rate, the runner passes `deepeval.integrations.langchain.CallbackHandler` in the `config["callbacks"]` of its own `ainvoke` calls.
+- That traces the graph with no change to app code, so the AGENTS.md rule holds. `@observe` stays out of the app.
+- Before adopting it, check that DeepEval's tracing registers no global OpenTelemetry tracer provider and sends nothing to Confident AI without a key.
+
 **Not used, and why:**
 
 | DeepEval feature | Why not, here |
 |---|---|
-| `@observe` / LangChain callback tracing, and the trajectory metrics that need it (`TaskCompletion`, `StepEfficiency`, `PlanAdherence`) | It would put a vendor SDK in app code, which AGENTS.md rules out. These metrics are LLM-judged, and judges need calibration first. The tool calls are already in the graph's messages. |
+| DeepEval tracing, and the trajectory metrics that need it (`TaskCompletion`, `StepEfficiency`, `PlanAdherence`) | These metrics are LLM-judged, and judges join the gate only after calibration (layer 3). The checks here need no tracing: the tool calls, arguments and results are already in the graph's messages. Redundant calls, if they become a check, can be detected deterministically (same tool, same arguments). |
 | `ToolCorrectnessMetric` | It compares a single-turn `LLMTestCase`'s `tools_called` against a fixed `expected_tools` list. Our rules are conditional ("no order unless an earlier check showed capacity"), not a fixed list. |
 | `ArgumentCorrectnessMetric`, `ToolUseMetric`, `GoalAccuracyMetric`, `ConversationalGEval`, `Expectations` | LLM-judged; they belong to phase 4's layer 3, after calibration. |
 | `ConversationSimulator` | A second LLM per turn adds variance and cost to a gate. Exploration already has the persona simulator. |
