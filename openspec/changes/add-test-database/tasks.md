@@ -18,7 +18,7 @@
 
 - [x] 3.1 In `apps/api/tests/integration/conftest.py`: read `TEST_DATABASE_URI` (skip reason names it; no fallback to `DATABASE_URI`), add `SEED_DAY = dt.date(2026, 3, 9)`, a session-scoped autouse fixture that loads `schema.sql` and `seed.sql` with `fornada.seed_day` set, and make `full_day` return `SEED_DAY + 3 days`; add a test that the seed day's +3 holds 15.0 kg; verify with `uv run task test:integration`
 - [x] 3.2 Replace `SystemClock(...).today()` with `FixedClock(SEED_DAY)` in `repositories/test_repositories.py` and `agents/test_tools.py`; verify `uv run task check` in `apps/api` passes with 442 + 1 tests and 0 skipped integration tests
-- [ ] 3.3 Verify independence from the dev database and the calendar: count the dev database's orders before and after `uv run task test:integration` (unchanged); commit an extra order into the test database by hand and rerun (same results); then run `uv run task check` in `apps/chat`, `apps/simulator` (counts unchanged)
+- [x] 3.3 Verify independence from the dev database and the calendar: count the dev database's orders before and after `uv run task test:integration` (unchanged); commit an extra order into the test database by hand and rerun (same results); then run `uv run task check` in `apps/chat`, `apps/simulator` (counts unchanged)
 
 ## Workflow follow-up
 
