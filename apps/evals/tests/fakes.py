@@ -19,7 +19,9 @@ USAGE = {"input_tokens": 100, "output_tokens": 20, "total_tokens": 120}
 class ScriptedChatModel(BaseChatModel):
     """Returns (or raises) the queued answers in order."""
 
-    answers: list[AIMessage | Exception]
+    # `AIMessage`s and exceptions. Typed `Any` so pydantic leaves them as they are: with
+    # a union, it tries to build an `AIMessage` from the exception.
+    answers: list[Any]
 
     @property
     def _llm_type(self) -> str:

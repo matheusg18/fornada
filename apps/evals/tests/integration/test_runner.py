@@ -5,9 +5,9 @@ import pytest
 from deepeval.test_case import ConversationalTestCase, Turn
 from fornada_api.agents.attendant.metrics import TokenPrices
 from fornada_api.agents.attendant.prompt import load_system_prompt
-from fornada_evals.runner import Agent, run_case
 
 from fornada_evals.dataset import CaseMetadata, GoldenCase
+from fornada_evals.runner import Agent, run_case
 from tests.fakes import ScriptedChatModel, reply, tool_call
 
 pytestmark = pytest.mark.anyio
@@ -39,7 +39,7 @@ def case(*turns: str, outage: bool = False) -> GoldenCase:
 
 def agent(*answers: object) -> Agent:
     return Agent(
-        model=ScriptedChatModel(answers=list(answers)),  # pyright: ignore[reportArgumentType]
+        model=ScriptedChatModel(answers=list(answers)),
         model_name=MODEL_NAME,
         prices=PRICES,
         daily_capacity_kg=Decimal(15),

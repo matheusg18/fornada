@@ -47,7 +47,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 4: the deterministic asser
   - metadata holds the run day, prompt version, model, latencies, tokens and cost.
 
   Verify they fail.
-- [ ] 4.2 Implement `fornada_evals.runner.run_case` (design.md, decisions 4 and 5): the graph with the in-memory saver and real tools on `FixedClock(run_day)`, chaos for outage cases, rendered turns, tool-call pairing by `tool_call_id`, latency, tokens and cost through the API's `TokenPrices`. Verify 4.1 passes and `uv run task check` passes.
+- [x] 4.2 Implement `fornada_evals.runner.run_case` (design.md, decisions 4 and 5): the graph with the in-memory saver and real tools on `FixedClock(run_day)`, chaos for outage cases, rendered turns, tool-call pairing by `tool_call_id`, latency, tokens and cost through the API's `TokenPrices`. Verify 4.1 passes and `uv run task check` passes.
 
 ## 5. Checks
 
