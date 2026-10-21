@@ -37,7 +37,7 @@ def config(conversation: uuid.UUID) -> Any:
 
 
 async def open_checkpointer() -> Checkpointer:
-    checkpointer = Checkpointer(os.environ["DATABASE_URI"])
+    checkpointer = Checkpointer(os.environ["TEST_DATABASE_URI"])
     await checkpointer.open()
     await checkpointer.ensure_setup()
     return checkpointer

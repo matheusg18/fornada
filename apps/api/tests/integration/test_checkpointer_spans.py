@@ -37,7 +37,7 @@ async def save_and_load(checkpointer: Checkpointer) -> None:
 @pytest.fixture
 async def traced() -> AsyncIterator[InMemorySpanExporter]:
     provider, exporter = build_provider()
-    checkpointer = Checkpointer(os.environ["DATABASE_URI"], tracer_provider=provider)
+    checkpointer = Checkpointer(os.environ["TEST_DATABASE_URI"], tracer_provider=provider)
     await checkpointer.open()
     await checkpointer.ensure_setup()
     exporter.clear()
@@ -58,7 +58,7 @@ async def test_checkpoint_statements_are_client_spans(traced: InMemorySpanExport
 async def test_without_a_provider_there_are_no_spans() -> None:
     provider, exporter = build_provider()
     # Not handed to the checkpointer, so nothing may reach it.
-    checkpointer = Checkpointer(os.environ["DATABASE_URI"])
+    checkpointer = Checkpointer(os.environ["TEST_DATABASE_URI"])
     await checkpointer.open()
     await checkpointer.ensure_setup()
     await save_and_load(checkpointer)

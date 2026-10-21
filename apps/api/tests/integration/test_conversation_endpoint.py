@@ -10,7 +10,7 @@ from sqlalchemy import create_engine, text
 
 from fornada_api.infrastructure.engine import to_async_url
 from fornada_api.main import app
-from tests.integration.conftest import DATABASE_URI
+from tests.integration.conftest import TEST_DATABASE_URI
 from tests.unit.agents.fakes import ScriptedChatModel, tool_call
 
 
@@ -28,10 +28,10 @@ def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
 
 
 def test_escalation_records_the_conversation_id_from_the_url(client: TestClient) -> None:
-    assert DATABASE_URI
+    assert TEST_DATABASE_URI
     conversation_id = uuid.uuid4()
     # Sync engine (psycopg) just for the check and the cleanup.
-    engine = create_engine(to_async_url(DATABASE_URI).set(drivername="postgresql+psycopg"))
+    engine = create_engine(to_async_url(TEST_DATABASE_URI).set(drivername="postgresql+psycopg"))
     try:
         response = client.post(
             f"/conversations/{conversation_id}/messages", json={"text": "quero falar com a dona"}
