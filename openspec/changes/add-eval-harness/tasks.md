@@ -10,7 +10,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 4: the deterministic asser
 
 ## 2. Dataset format and date rendering
 
-- [ ] 2.1 Write failing unit tests in `apps/evals/tests/unit/test_dataset.py` for the spec's "Every golden case traces back…" and "Case dates are relative…" scenarios:
+- [x] 2.1 Write failing unit tests in `apps/evals/tests/unit/test_dataset.py` for the spec's "Every golden case traces back…" and "Case dates are relative…" scenarios:
   - a complete case loads;
   - a missing source or an unknown check fails, naming the case;
   - `serving_rule` without a party size fails;
@@ -19,7 +19,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 4: the deterministic asser
   - text with other braces is left alone.
 
   Verify they fail.
-- [ ] 2.2 Implement `fornada_evals.dataset`: a Pydantic model for `additional_metadata` (design.md, decision 6), loading through `EvaluationDataset.add_goldens_from_jsonl_file`, validation, and `render(text, run_day)`. Verify 2.1 passes.
+- [x] 2.2 Implement `fornada_evals.dataset`: a Pydantic model for `additional_metadata` (design.md, decision 6), loading through `EvaluationDataset.add_goldens_from_jsonl_file`, validation, and `render(text, run_day)`. Verify 2.1 passes.
 
 ## 3. Per-case isolation
 
