@@ -1,12 +1,15 @@
 """One PostgreSQL schema per case run, loaded from the dev schema and seed.
 
-Each run gets `eval_<hex>` in the `fornada` database, with its own copy of the seed, so
-runs cannot see each other's orders (parallel tool calls and xdist workers included) and
-`public` is never touched. The role owns the database, so it can create schemas without
-`CREATEDB`. See the `add-eval-harness` design, decision 3.
+Each run gets `eval_<hex>` in the test database (`postgres-test`, reached through
+`TEST_DATABASE_URI`), with its own copy of the seed pinned to `SEED_DAY`, so runs cannot
+see each other's orders (parallel tool calls and xdist workers included), results do not
+depend on the calendar, and the dev database is never touched. The role owns the
+database, so it can create schemas without `CREATEDB`. See the `add-eval-harness`
+design, decision 3.
 """
 
 import datetime as dt
+import os
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -22,6 +25,19 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 SQL_DIR = Path(__file__).resolve().parents[4] / ".devcontainer" / "db"
 SCHEMA_PREFIX = "eval_"
 APPLICATION_NAME = "fornada-evals"
+TEST_DATABASE_ENV = "TEST_DATABASE_URI"
+# A Monday, the same as the API's integration tests: the seed fills day +3 (15 kg) and +4.
+SEED_DAY = dt.date(2026, 3, 9)
+
+
+def require_test_database_url() -> str:
+    """The test database's URL. Raises when it is unset: a gate that skipped would pass."""
+    url = os.environ.get(TEST_DATABASE_ENV)
+    if not url:
+        raise RuntimeError(
+            f"{TEST_DATABASE_ENV} is not set; the evals run only on the test database"
+        )
+    return url
 
 
 @dataclass(frozen=True)
@@ -37,7 +53,7 @@ async def isolated_database(database_url: str) -> AsyncGenerator[CaseDatabase]:
     schema = f"{SCHEMA_PREFIX}{uuid.uuid4().hex[:12]}"
     engine = None
     try:
-        run_day = await _create_and_seed(database_url, schema)
+        await _create_and_seed(database_url, schema)
         engine = create_async_engine(
             to_async_url(database_url),
             connect_args={
@@ -50,7 +66,7 @@ async def isolated_database(database_url: str) -> AsyncGenerator[CaseDatabase]:
         event.listen(engine.sync_engine, "handle_error", drop_server_detail)
         yield CaseDatabase(
             schema=schema,
-            run_day=run_day,
+            run_day=SEED_DAY,
             sessionmaker=async_sessionmaker(engine, expire_on_commit=False, autoflush=False),
         )
     finally:
@@ -72,20 +88,18 @@ async def sweep(database_url: str) -> list[str]:
     return names
 
 
-async def _create_and_seed(database_url: str, schema: str) -> dt.date:
+async def _create_and_seed(database_url: str, schema: str) -> None:
     async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as conn:
         await conn.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
         await conn.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(schema)))
+        # The seed dates everything from this setting instead of today.
+        await conn.execute(
+            "SELECT set_config('fornada.seed_day', %s, false)", (SEED_DAY.isoformat(),)
+        )
         # Multi-statement scripts with their own BEGIN/COMMIT; no parameters, so psycopg
         # sends each file as one simple query.
         await conn.execute((SQL_DIR / "schema.sql").read_bytes())
         await conn.execute((SQL_DIR / "seed.sql").read_bytes())
-        # The seed sets the session's time zone to America/Sao_Paulo and dates everything
-        # from CURRENT_DATE there; read it in the same session so the run day matches.
-        cursor = await conn.execute("SELECT CURRENT_DATE")
-        row = await cursor.fetchone()
-    assert row is not None
-    return row[0]
 
 
 async def _drop(database_url: str, schemas: list[str]) -> None:

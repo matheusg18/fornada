@@ -33,7 +33,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 4: the deterministic asser
   Verify they fail.
 - [x] 3.2 Implement `fornada_evals.isolation` (design.md, decision 3): an async context manager that yields the run day and an `async_sessionmaker` bound to the case's schema (with `hide_parameters=True`), plus `sweep()`. Verify 3.1 passes and that `public`'s order count is unchanged before and after the tests.
 - [x] 3.3 Rework the isolation tests for the test database (`add-test-database`): read `TEST_DATABASE_URI` (skip reason names it; no fallback to `DATABASE_URI`), and replace "the run day equals the database's `CURRENT_DATE`" with "the run day is `SEED_DAY` (2026-03-09) and its +3 has 0 free kg". Verify the changed tests fail.
-- [ ] 3.4 Rework `fornada_evals.isolation` (design.md, decision 3): connect through `TEST_DATABASE_URI`, define `SEED_DAY = dt.date(2026, 3, 9)`, set `fornada.seed_day` before loading the seed, and yield `SEED_DAY` as the run day; add a function that raises an error naming `TEST_DATABASE_URI` when it is unset, for the suite (7.4). Verify 3.3 passes, the dev database's order count is unchanged, and `uv run task check` passes in `apps/evals`.
+- [x] 3.4 Rework `fornada_evals.isolation` (design.md, decision 3): connect through `TEST_DATABASE_URI`, define `SEED_DAY = dt.date(2026, 3, 9)`, set `fornada.seed_day` before loading the seed, and yield `SEED_DAY` as the run day; add a function that raises an error naming `TEST_DATABASE_URI` when it is unset, for the suite (7.4). Verify 3.3 passes, the dev database's order count is unchanged, and `uv run task check` passes in `apps/evals`.
 
 ## 4. Runner
 
