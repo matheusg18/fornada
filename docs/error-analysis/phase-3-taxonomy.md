@@ -120,8 +120,6 @@ The first error hides the more severe failures, which come later.
 
 ## 6. Decision: eval, code fix or accept
 
-TODO(human): the decision is the maintainer's (phase 3 core). The column below holds the LLM's suggestions, plus the maintainer's where they wrote one.
-
 | Category | Suggestion | Decision |
 |---|---|---|
 | DATE | Code: give the agent today's date (America/Recife time zone) in its state. Alternatively, as the maintainer suggests, let the tool infer the year from DD/MM or from a weekday. The two can be combined. Deterministic eval: no date argument earlier than today | |
