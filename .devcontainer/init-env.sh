@@ -33,6 +33,8 @@ if [[ ! -f "$env_file" ]]; then
   cat > "$env_file" <<EOF
 POSTGRES_PASSWORD=$(hex 24)
 FORNADA_DB_PASSWORD=$(hex 24)
+POSTGRES_TEST_PASSWORD=$(hex 24)
+FORNADA_TEST_DB_PASSWORD=$(hex 24)
 LANGFUSE_DB_PASSWORD=$(hex 24)
 LANGFUSE_SALT=$(hex 24)
 LANGFUSE_ENCRYPTION_KEY=$(hex 32)
@@ -74,3 +76,5 @@ ensure_secret KIBANA_SYSTEM_PASSWORD "$(hex 24)"
 ensure_secret KIBANA_ENCRYPTION_KEY "$(hex 32)"
 ensure_secret ELASTIC_OTEL_PASSWORD "$(hex 24)"
 ensure_secret PHONE_HASH_SALT "$(hex 32)"
+ensure_secret POSTGRES_TEST_PASSWORD "$(hex 24)"
+ensure_secret FORNADA_TEST_DB_PASSWORD "$(hex 24)"

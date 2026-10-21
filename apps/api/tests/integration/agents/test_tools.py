@@ -7,7 +7,6 @@ import logging
 import uuid
 from decimal import Decimal
 from typing import Any
-from zoneinfo import ZoneInfo
 
 import pytest
 from langchain_core.messages import AIMessage, ToolMessage
@@ -27,11 +26,12 @@ from fornada_api.agents.attendant.tools import build_tools
 from fornada_api.core.config import ChaosSettings
 from fornada_api.infrastructure.chaos import Chaos
 from fornada_api.models import Customer, Escalation, Order, OrderStatus, Product, SentMessage
-from fornada_api.services.clock import SystemClock
+from fornada_api.services.clock import FixedClock
+from tests.integration.conftest import SEED_DAY
 
 pytestmark = pytest.mark.anyio
 
-CLOCK = SystemClock(ZoneInfo("America/Sao_Paulo"))
+CLOCK = FixedClock(SEED_DAY)
 TODAY = CLOCK.today()
 DAY = dt.timedelta(days=1)
 

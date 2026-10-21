@@ -1,14 +1,20 @@
-"""Integration tests run against the dev container's seeded database.
+"""Integration tests run against the test-only database, seeded for a fixed day.
 
-They are skipped when `DATABASE_URI` is not set (outside the dev container).
+At the start of each session the app tables are recreated and the seed is
+loaded with `fornada.seed_day` pinned to `SEED_DAY`, so results depend neither
+on the calendar nor on the dev database. They are skipped when
+`TEST_DATABASE_URI` is not set (outside the dev container); there is no
+fallback to `DATABASE_URI`.
 """
 
 import datetime as dt
 import os
 from collections.abc import AsyncIterator, Iterator
+from pathlib import Path
+from typing import LiteralString, cast
 
+import psycopg
 import pytest
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -19,15 +25,32 @@ from sqlalchemy.ext.asyncio import (
 from fornada_api.core.config import get_settings
 from fornada_api.infrastructure.engine import get_engine, get_sessionmaker, to_async_url
 
-DATABASE_URI = os.environ.get("DATABASE_URI")
+TEST_DATABASE_URI = os.environ.get("TEST_DATABASE_URI")
+
+# A Monday; the seed fills day +3 (15 kg) and +4, and leaves 2 kg on day +5.
+SEED_DAY = dt.date(2026, 3, 9)
+
+DB_DIR = Path(__file__).parents[4] / ".devcontainer" / "db"
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     for item in items:
         if item.path.is_relative_to(os.path.dirname(__file__)):
             item.add_marker(pytest.mark.integration)
-            if not DATABASE_URI:
-                item.add_marker(pytest.mark.skip(reason="DATABASE_URI is not set"))
+            if not TEST_DATABASE_URI:
+                item.add_marker(pytest.mark.skip(reason="TEST_DATABASE_URI is not set"))
+
+
+@pytest.fixture(scope="session", autouse=True)
+def seeded_database() -> None:
+    """Recreate the app tables and load the seed for `SEED_DAY`, once per session."""
+    if not TEST_DATABASE_URI:
+        return
+    with psycopg.connect(TEST_DATABASE_URI, autocommit=True) as conn:
+        conn.execute("SELECT set_config('fornada.seed_day', %s, false)", (SEED_DAY.isoformat(),))
+        for name in ("schema.sql", "seed.sql"):
+            # Committed files from the repo, so trusted SQL; psycopg types it as LiteralString.
+            conn.execute(cast(LiteralString, (DB_DIR / name).read_text()))
 
 
 @pytest.fixture
@@ -43,9 +66,9 @@ def clear_caches() -> None:
 
 @pytest.fixture(autouse=True)
 def db_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Point the app at the seeded database, with a placeholder LLM key."""
-    if DATABASE_URI:
-        monkeypatch.setenv("DB__URL", DATABASE_URI)
+    """Point the app at the test database, with a placeholder LLM key."""
+    if TEST_DATABASE_URI:
+        monkeypatch.setenv("DB__URL", TEST_DATABASE_URI)
     monkeypatch.setenv("LLM__PROVIDER", "anthropic")
     monkeypatch.setenv("LLM__ANTHROPIC__API_KEY", "sk-ant-test")
     clear_caches()
@@ -64,8 +87,8 @@ async def app_engine() -> AsyncIterator[AsyncEngine]:
 @pytest.fixture
 async def engine() -> AsyncIterator[AsyncEngine]:
     """A test-owned engine, independent of the app's cached one."""
-    assert DATABASE_URI
-    engine = create_async_engine(to_async_url(DATABASE_URI))
+    assert TEST_DATABASE_URI
+    engine = create_async_engine(to_async_url(TEST_DATABASE_URI))
     yield engine
     await engine.dispose()
 
@@ -99,21 +122,6 @@ async def rollback_sessionmaker(
 
 
 @pytest.fixture
-async def full_day(session: AsyncSession) -> dt.date:
-    """The first future date whose non-cancelled orders fill the default 15 kg.
-
-    The seed creates one at run day + 3, relative to the day it was applied,
-    so the offset from today changes as the dev database ages.
-    """
-    day = await session.scalar(
-        text(
-            "SELECT delivery_date FROM orders"
-            " WHERE status <> 'cancelled'"
-            "   AND delivery_date > (now() AT TIME ZONE 'America/Sao_Paulo')::date"
-            " GROUP BY delivery_date HAVING sum(weight_kg) = 15"
-            " ORDER BY delivery_date LIMIT 1"
-        )
-    )
-    if day is None:
-        pytest.skip("no full day left in the seed; reset the database")
-    return day
+def full_day() -> dt.date:
+    """The seeded day whose non-cancelled orders fill the default 15 kg."""
+    return SEED_DAY + dt.timedelta(days=3)

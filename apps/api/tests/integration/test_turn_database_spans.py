@@ -33,7 +33,7 @@ async def turn_spans(
     """The spans of one turn that calls `search_catalog`."""
     provider = trace.get_tracer_provider()
     instrument_engine(app_engine, provider)  # pyright: ignore[reportArgumentType]
-    checkpointer = Checkpointer(os.environ["DATABASE_URI"], provider)  # pyright: ignore[reportArgumentType]
+    checkpointer = Checkpointer(os.environ["TEST_DATABASE_URI"], provider)  # pyright: ignore[reportArgumentType]
     await checkpointer.open()
     await checkpointer.ensure_setup()
     spans.clear()

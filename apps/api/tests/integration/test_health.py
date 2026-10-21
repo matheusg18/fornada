@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import psycopg
@@ -8,8 +7,7 @@ from fastapi.testclient import TestClient
 from fornada_api.core.config import ConfigError
 from fornada_api.infrastructure.engine import APPLICATION_NAME
 from fornada_api.main import app
-
-DATABASE_URI = os.environ.get("DATABASE_URI")
+from tests.integration.conftest import TEST_DATABASE_URI
 
 
 def test_seeded_database() -> None:
@@ -24,8 +22,8 @@ def test_seeded_database() -> None:
 
 
 def test_no_personal_data_in_response() -> None:
-    assert DATABASE_URI
-    with psycopg.connect(DATABASE_URI) as conn:
+    assert TEST_DATABASE_URI
+    with psycopg.connect(TEST_DATABASE_URI) as conn:
         customers = conn.execute("SELECT name, phone FROM customers").fetchall()
         addresses = conn.execute("SELECT address FROM orders WHERE address IS NOT NULL").fetchall()
     with TestClient(app) as client:
@@ -45,8 +43,8 @@ def test_database_down(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def count_app_connections() -> int:
-    assert DATABASE_URI
-    with psycopg.connect(DATABASE_URI) as conn:
+    assert TEST_DATABASE_URI
+    with psycopg.connect(TEST_DATABASE_URI) as conn:
         row = conn.execute(
             "SELECT count(*) FROM pg_stat_activity WHERE application_name = %s",
             (APPLICATION_NAME,),

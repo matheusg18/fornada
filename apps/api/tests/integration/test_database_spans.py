@@ -49,7 +49,7 @@ async def test_select_is_a_client_span_with_its_statement(
     assert span.kind is SpanKind.CLIENT
     assert span.attributes is not None
     assert span.attributes["db.system.name"] == "postgresql"
-    assert span.attributes["db.namespace"] == "fornada"
+    assert span.attributes["db.namespace"] == app_engine.url.database
     assert span.attributes["db.query.text"] == "SELECT count(*) FROM products"
 
 

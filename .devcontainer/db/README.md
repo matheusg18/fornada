@@ -20,11 +20,23 @@ The seed also runs by itself, once, when Postgres starts on an empty data volume
 
 ## Dates are relative
 
-The seed sets `America/Sao_Paulo` and writes every date as an offset from today, so it stays fresh whenever it runs:
+The seed sets `America/Sao_Paulo` and writes every date as an offset from the run day, so it stays fresh whenever it runs. The run day is the `fornada.seed_day` session setting (`YYYY-MM-DD`) when it is set, and otherwise today in São Paulo:
 
 - orders are delivered from 90 days ago to 14 days ahead;
 - days +3 and +4 are full (15.0 kg) and day +5 has 2 kg free, all beyond the 48 h lead time;
 - fixed-day holidays (capacity 0) exist for this year and the next, plus a 25 kg override on Dec 24.
+
+### Pinning the run day
+
+Tests pin the day so the data does not depend on the calendar. The API's integration tests use Monday 2026-03-09 (`SEED_DAY` in `apps/api/tests/integration/conftest.py`), so days +3..+5 (12–14 March) have no holiday. From `psql`:
+
+```sh
+PGOPTIONS='-c fornada.seed_day=2026-03-09' psql "$TEST_DATABASE_URI" -v ON_ERROR_STOP=1 -f .devcontainer/db/schema.sql -f .devcontainer/db/seed.sql
+```
+
+From a driver, run `SET fornada.seed_day = '2026-03-09'` in the session before the two files. A value that is not an ISO date (for example `09/03/2026`) makes the seed fail before inserting any row. Without the setting the dev reset, the first-start init and the simulator behave as before.
+
+Limit: column defaults such as `created_at` keep the server's real `now()`, so only the explicit dates follow the run day. No business rule reads them.
 
 Holiday caveat: if a run lands so that day +3..+5 falls on a holiday (for example, on Dec 22), the "full" day overlaps a closed one. A check of `orders > capacity` still refuses it.
 
