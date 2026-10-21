@@ -115,6 +115,7 @@ The first error hides the more severe failures, which come later.
 - **Shared state.** The database accumulates orders across cells. 2025 dates were "taken" by earlier cells' orders, and 10-21 reached about 15 kg.
 - **Persona loops.** The `mae_alergica` and `indecisa` personas repeat their request until the 8-turn cap. Much of the 55 `max_turns` outcomes is the persona looping, not the agent.
 - **Personas fix the date.** The persona sometimes resolves the date itself ("Hoje é 19/10/2026"), which hides the DATE error in those cells.
+- **No real people.** The roadmap asks for 3–4 conversations with real people next to the simulated ones. None were collected, so every count here comes from the simulator, whose personas can hide failures that real customers would trigger.
 - **Annotation coverage.** The LLM annotation was one pass, and the maintainer's reading covered a sample. The *manual* counts have a margin, and no judge is calibrated against them yet.
 
 ## 6. Decision: eval, code fix or accept
