@@ -9,8 +9,8 @@
   - Tool errors come back as `ToolMessage(status="error")`.
   - The prompt has not changed since the `v0` tag (only instrumentation and chaos mode were added to tools and graph since), so a baseline run on the current code measures `v0`'s behavior.
 - **The database.**
-  - The seed dates everything from `CURRENT_DATE` when it is loaded. It fills run day +3 and +4. The server runs in UTC, but `seed.sql` sets its session to `America/Sao_Paulo` first, so `CURRENT_DATE` is the Brazilian date.
-  - `schema.sql` creates unqualified tables, so it loads into whatever `search_path` names. The `fornada` role owns the database and can create schemas, but it cannot create databases. Loading `schema.sql` and `seed.sql` into a fresh schema takes about 0.26 s.
+  - The seed dates everything from its run day: the `fornada.seed_day` session setting when set, otherwise today in `America/Sao_Paulo` (`add-test-database`). It fills run day +3 and +4.
+  - Tests run on the test-only server `postgres-test`, reached through `TEST_DATABASE_URI` (`test-database` spec), never on the dev database. `schema.sql` creates unqualified tables, so it loads into whatever `search_path` names. The `fornada_test` role owns its database and can create schemas, but it cannot create databases. Loading `schema.sql` and `seed.sql` into a fresh schema takes about 0.26 s.
   - The graph's `ToolNode` runs a turn's tool calls concurrently (`asyncio.gather`). Phase 3 saw 7 parallel `check_capacity` calls, so a single shared connection rolled back at the end (`rollback_sessionmaker` in the API's integration tests) would break under concurrent sessions.
 - **DeepEval 4.3.1** (2026-10-16), read from its docs and its installed source:
   - multi-turn cases are `ConversationalTestCase(turns=[Turn(role, content, tools_called=[ToolCall(name, input_parameters, output)])], metadata=…)`;
@@ -94,8 +94,8 @@ This is the documented path for multi-turn, tool-using agents without tracing.
 For each run of a case:
 
 1. `CREATE SCHEMA eval_<hex>`.
-2. Execute `schema.sql` and `seed.sql` with `SET search_path TO eval_<hex>`, through psycopg on one connection, since each file is a multi-statement script.
-3. Read `SELECT CURRENT_DATE` in that session as the run day.
+2. Execute `schema.sql` and `seed.sql` with `SET fornada.seed_day = '2026-03-09'` and `SET search_path TO eval_<hex>`, through psycopg on one connection, since each file is a multi-statement script.
+3. The run day is `SEED_DAY` (Monday 2026-03-09, in `fornada_evals.isolation`), the same value as the API's integration tests.
 4. Build an async engine with `connect_args={"options": "-c search_path=eval_<hex>"}`, and hand its `async_sessionmaker` to `build_tools`.
 5. Run the case.
 6. Dispose the engine and `DROP SCHEMA … CASCADE` in a `finally`.
@@ -103,13 +103,15 @@ For each run of a case:
 A session-start sweep drops `eval_*` schemas left by a killed run.
 
 - Each run has its own copy of the seed, so parallel tool calls and xdist workers are safe, and `public` is never touched (spec: "Each case runs in isolation").
-- The run day comes from the database, read in the session that loaded the seed. `seed.sql` sets that session to `America/Sao_Paulo`, so the run day is the date the seed counted from, even from 21:00 to 24:00 in Brazil, when a new UTC session's `CURRENT_DATE` is already the next day. The tools get `FixedClock(run_day)`, so the agent's lead-time math and the seed's full days line up.
+- The run day is fixed, not the calendar date. A case renders the same text and meets the same full days on any day it runs, and no time-zone edge (21:00 to 24:00 in Brazil, when UTC is already the next day) can shift it. The tools get `FixedClock(run_day)`, so the agent's lead-time math and the seed's full days line up.
+- The suite connects only through `TEST_DATABASE_URI`, never `DATABASE_URI`. The integration tests in `apps/evals` skip without it, as the API's do. The paid suite fails at session start instead, naming the variable, because a skipped gate would pass silently.
 - The engine keeps the API's `hide_parameters=True`.
 
 *Alternatives:*
 - **Shared connection with an outer transaction** (as in the integration tests): breaks under concurrent tool calls.
 - **A database per case from a template**: needs `CREATEDB`, which the role lacks.
 - **Resetting `public` per case**: destroys dev data and forces serial runs.
+- **Per-run schemas in the dev database** (this change's first plan): the suite would share the dev server's state and its sweep could drop another session's schemas. Superseded by `add-test-database`.
 
 ### 4. The runner: real graph, real model, in-process
 
@@ -259,7 +261,8 @@ About 30 cases, drafted by the agent from the open codes, each citing its `#n`. 
 - **[Cost]** About US$ 1–2 per full run, the agent's model calls only. → The suite is opt-in (not in `task check`), each run reports its cost, and a cost ceiling is part of the gate.
 - **[DeepEval API churn]** 4.x moves fast (4.3.1 shipped 5 days before this design). → `uv.lock` pins it. Only stable, documented classes are used (`ConversationalTestCase`, `Turn`, `ToolCall`, `BaseConversationalMetric`, `assert_test`, the JSONL loader).
 - **[`.env` auto-load]** `import deepeval` reads `.env` from the working directory. → The suite runs from the repo root, whose `.env` the API already reads. Nothing new is loaded.
-- **[Leftover schemas]** A killed run leaves `eval_*` schemas behind. → The sweep at session start, plus the reset command in `.devcontainer/db/README.md`.
+- **[Leftover schemas]** A killed run leaves `eval_*` schemas behind. → The sweep at session start, or `docker compose restart postgres-test` on the host.
+- **[Two suite sessions on one server]** Each session's sweep would drop the other's live schemas. → Run one session at a time locally; in CI each job gets its own service container.
 
 ## Migration Plan
 

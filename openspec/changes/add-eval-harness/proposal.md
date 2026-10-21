@@ -13,8 +13,8 @@ Phase 3 left a failure taxonomy with counts and a decision per category (`docs/e
   - dates in the turns are written relative to the run day and rendered when the case runs.
 - An **in-process runner**:
   - it plays a case's turns through the real attendant graph and the real model, with the nine real tools;
-  - each case gets its own PostgreSQL schema, loaded from the dev schema and seed, so no case sees another's orders. This was a phase 3 caveat;
-  - the clock is fixed to the seed's day, and an in-memory checkpointer is used;
+  - each case gets its own PostgreSQL schema in the test-only database (`add-test-database`), loaded from the schema and seed, so no case sees another's orders. This was a phase 3 caveat;
+  - the seed and the clock are fixed to one seed day (2026-03-09), and an in-memory checkpointer is used;
   - the conversation becomes a DeepEval `ConversationalTestCase`, with each assistant turn's tool calls as `ToolCall`s (name, arguments, result), plus per-turn latency and token cost.
 - **Layer 1, deterministic checks**, as DeepEval custom metrics (`BaseConversationalMetric`, no LLM):
   - DATE: no date argument earlier than the run day;
@@ -51,6 +51,6 @@ None. The 150 g per person rule is a product decision recorded in the taxonomy. 
 - **New:** `apps/evals/` (package, dataset, metrics, runner, reporter, unit tests). The workspace's `apps/*` glob picks it up.
 - **Dependencies:** `deepeval` (latest, 4.3.1 at the time of writing), added to `fornada-evals` only. The workspace has one virtualenv, so DeepEval's pytest plugins (its own, `pytest-asyncio`, `pytest-xdist`, `pytest-repeat`, `pytest-rerunfailures`) become importable from every app. The other apps' suites must stay green, and any plugin that interferes is disabled in that app's `addopts`.
 - **Telemetry:** DeepEval's anonymous usage telemetry is turned off for eval runs (`DEEPEVAL_TELEMETRY_OPT_OUT=1`). No result goes to Confident AI. DeepEval is never imported by app code: the runner reads tool calls from the graph's messages, not from DeepEval's `@observe` tracing.
-- **Database:** each case creates and drops a schema named `eval_<id>` in the `fornada` database. The role already owns that database, so no new privilege is needed, and the `public` schema is never touched.
+- **Database:** depends on `add-test-database`. Each case creates and drops a schema named `eval_<id>` in the `fornada_test` database of the `postgres-test` server (`TEST_DATABASE_URI`). The role already owns that database, so no new privilege is needed; the `public` schema is never touched and the dev database is never used.
 - **Cost:** the agent's model calls only, since this change has no LLM judge. About US$ 0.02–0.04 per conversation (phase 2 measured US$ 0.0375 per conversation of up to 8 turns), so a full run of about 30 cases with the critical ones tripled costs roughly US$ 1–2, within the US$ 20/month budget.
 - **Docs:** `apps/evals/README.md` explains how to run it, and `AGENTS.md` gets a short section. The baseline report goes to `docs/evals/`.

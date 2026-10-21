@@ -22,7 +22,7 @@ Each golden case SHALL name its taxonomy category, the phase 3 conversation it r
 - **THEN** loading fails with an error naming the case and the check
 
 ### Requirement: Case dates are relative to the run day
-A case's customer turns SHALL write dates as offsets from the run day, and the suite SHALL render them in Brazilian Portuguese form (`DD/MM`, or a weekday name) when the case runs. The run day SHALL be the day the case's seed was loaded.
+A case's customer turns SHALL write dates as offsets from the run day, and the suite SHALL render them in Brazilian Portuguese form (`DD/MM`, or a weekday name) when the case runs. The run day SHALL be the fixed seed day the case's seed is loaded with, never the calendar date.
 
 #### Scenario: Day plus three
 - **WHEN** a case says "quero um bolo para {d+3:dd/mm}" and the run day is 2026-10-21
@@ -32,8 +32,12 @@ A case's customer turns SHALL write dates as offsets from the run day, and the s
 - **WHEN** a case asks for the run day plus 3
 - **THEN** `check_capacity` for that date reports no free kg, as the seed fills it
 
+#### Scenario: Same text on any day
+- **WHEN** the suite runs a case on two different calendar days
+- **THEN** the customer turns sent to the agent are identical in both runs
+
 ### Requirement: Each case runs in isolation
-Each run of a case SHALL see the dev schema and seed as freshly loaded, and nothing else: no order, message or escalation written by another case or by the dev environment. When the run ends, whatever it wrote SHALL be gone. The suite SHALL NOT read or write the app's own tables.
+Each run of a case SHALL see the schema and seed as freshly loaded in the test-only database (`TEST_DATABASE_URI`), and nothing else: no order, message or escalation written by another case or by the dev environment. When the run ends, whatever it wrote SHALL be gone. The suite SHALL NOT read or write the app's own tables, and SHALL NOT connect to the dev database.
 
 #### Scenario: Orders do not leak
 - **WHEN** one case creates an order for the run day plus 8 and another case then checks capacity for that date
@@ -42,6 +46,10 @@ Each run of a case SHALL see the dev schema and seed as freshly loaded, and noth
 #### Scenario: Dev data untouched
 - **WHEN** the suite finishes
 - **THEN** the dev database's orders, messages and escalations are the same as before the run
+
+#### Scenario: Without the test database
+- **WHEN** the suite starts without `TEST_DATABASE_URI`
+- **THEN** it fails before running any case, with an error naming the variable
 
 ### Requirement: The agent runs as it ships
 A case SHALL run the attendant's graph with its system prompt, the configured model and provider, and the nine tools with their business rules, unchanged. The tools' clock SHALL be fixed to the run day. Each run SHALL record the prompt version and the model.
