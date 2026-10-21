@@ -52,7 +52,7 @@ addopts = "-ra --strict-markers --import-mode=importlib"
 testpaths = ["tests"]
 pythonpath = ["."]
 markers = [
-    "integration: needs the dev container's seeded Postgres (DATABASE_URI)",
+    "integration: needs the test database (TEST_DATABASE_URI)",
 ]
 
 # Run from apps/evals: `uv run task <name>`.

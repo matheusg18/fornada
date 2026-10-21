@@ -37,7 +37,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 4: the deterministic asser
 
 ## 4. Runner
 
-- [ ] 4.1 Write failing tests in `apps/evals/tests/integration/test_runner.py`, with a scripted fake chat model (a small local fake modeled on `apps/api/tests/unit/agents/fakes.py`, since that module is not importable across apps) and the real tools in an isolated schema:
+- [x] 4.1 Write failing tests in `apps/evals/tests/integration/test_runner.py`, with a scripted fake chat model (a small local fake modeled on `apps/api/tests/unit/agents/fakes.py`, since that module is not importable across apps) and the real tools in an isolated schema:
   - a 2-turn case records 2 user turns and 2 assistant turns;
   - a turn with `check_capacity` then `calculate_quote` lists both `ToolCall`s with arguments and results, in order;
   - an error result is marked as an error in the turn's metadata;
