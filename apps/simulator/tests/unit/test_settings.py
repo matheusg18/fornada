@@ -79,6 +79,26 @@ def test_telemetry_reads_the_shared_variables(monkeypatch: pytest.MonkeyPatch) -
     assert telemetry.otlp_endpoint == "http://collector:4318"
 
 
+def test_content_capture_is_off_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SIMULATOR__ANTHROPIC__API_KEY", KEY)
+    monkeypatch.setenv("TELEMETRY__ENABLED", "true")
+    assert load().telemetry.capture_content is False
+
+
+def test_content_capture_reads_the_shared_variable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SIMULATOR__ANTHROPIC__API_KEY", KEY)
+    monkeypatch.setenv("TELEMETRY__ENABLED", "true")
+    monkeypatch.setenv("TELEMETRY__CAPTURE_CONTENT", "true")
+    assert load().telemetry.capture_content is True
+
+
+def test_content_capture_needs_tracing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SIMULATOR__ANTHROPIC__API_KEY", KEY)
+    monkeypatch.setenv("TELEMETRY__CAPTURE_CONTENT", "true")
+    telemetry = load().telemetry
+    assert (telemetry.enabled, telemetry.capture_content) == (False, False)
+
+
 def test_invalid_otlp_endpoint_names_the_variable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SIMULATOR__ANTHROPIC__API_KEY", KEY)
     monkeypatch.setenv("TELEMETRY__OTLP_ENDPOINT", "edot-collector:4318")

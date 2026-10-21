@@ -197,6 +197,65 @@ async def test_span_carries_no_message_text(spans: InMemorySpanExporter) -> None
     values = " ".join(str(v) for v in attrs(span).values())
     assert "81987654321" not in values
     assert "Olá!" not in values
+    assert "gen_ai.input.messages" not in attrs(span)
+    assert "gen_ai.output.messages" not in attrs(span)
+
+
+@pytest.fixture
+def capturing(provider: TracerProvider, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Content capture on, as `use_tracer_provider` sets it at startup."""
+    monkeypatch.setattr(client, "_capture_content", True)
+
+
+def messages(span: ReadableSpan, key: str) -> list[dict[str, Any]]:
+    return json.loads(attrs(span)[key])
+
+
+@pytest.mark.usefixtures("capturing")
+async def test_capture_puts_the_message_and_replies_on_the_span(
+    spans: InMemorySpanExporter,
+) -> None:
+    body = {"replies": [{"text": "Oi! Vou ver o catálogo."}, {"text": "Temos chocolate."}]}
+    async with make_client(replying(body=body)) as http:
+        await send_message(http, CONVERSATION_ID, "Oi")
+
+    (span,) = client_spans(spans)
+    assert messages(span, "gen_ai.input.messages") == [
+        {"role": "user", "parts": [{"type": "text", "content": "Oi"}]}
+    ]
+    assert messages(span, "gen_ai.output.messages") == [
+        {"role": "assistant", "parts": [{"type": "text", "content": "Oi! Vou ver o catálogo."}]},
+        {"role": "assistant", "parts": [{"type": "text", "content": "Temos chocolate."}]},
+    ]
+
+
+@pytest.mark.usefixtures("capturing")
+async def test_capture_keeps_the_input_of_a_failed_post(spans: InMemorySpanExporter) -> None:
+    async with make_client(raising(httpx2.ReadTimeout("slow"))) as http:
+        with pytest.raises(ApiError):
+            await send_message(http, CONVERSATION_ID, "Oi")
+
+    (span,) = client_spans(spans)
+    assert messages(span, "gen_ai.input.messages")[0]["parts"][0]["content"] == "Oi"
+    assert "gen_ai.output.messages" not in attrs(span)
+
+
+@pytest.mark.usefixtures("capturing")
+async def test_capture_keeps_accents(spans: InMemorySpanExporter) -> None:
+    async with make_client(ok()) as http:
+        await send_message(http, CONVERSATION_ID, "Olá, é possível?")
+
+    (span,) = client_spans(spans)
+    assert "Olá, é possível?" in attrs(span)["gen_ai.input.messages"]
+
+
+async def test_use_tracer_provider_sets_capture(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(client, "tracer", client.tracer)
+    monkeypatch.setattr(client, "_capture_content", False)
+    provider = TracerProvider()
+    client.use_tracer_provider(provider, capture_content=True)
+    assert client._capture_content is True
+    provider.shutdown()
 
 
 @pytest.mark.parametrize(

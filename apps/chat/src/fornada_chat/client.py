@@ -6,9 +6,12 @@ surfaces as one `ApiError`, so the UI layer has a single thing to catch.
 
 Each post is one CLIENT span, the root of that turn's trace. Its context goes
 to the API in a `traceparent` header, so the API's spans join the trace (see
-the `client-tracing` spec). Mirrors the simulator's client, minus the persona.
+the `client-tracing` spec). With content capture on, the span also carries
+the turn's message and replies, which Langfuse shows as the trace's input and
+output. Mirrors the simulator's client, minus the persona.
 """
 
+import json
 import logging
 import os
 from collections.abc import Mapping
@@ -29,6 +32,8 @@ logger = logging.getLogger(__name__)
 # A no-op until the startup hook calls `use_tracer_provider` with the chat's
 # private provider (see `telemetry.py`).
 tracer: Tracer = trace.NoOpTracer()
+# Set with the tracer, so it stays off while tracing is off.
+_capture_content = False
 
 URL_TEMPLATE = "/conversations/{conversation_id}/messages"
 # Semconv `{method} {url.template}`: the template, never the id.
@@ -46,6 +51,8 @@ SERVER_PORT = "server.port"
 SESSION_ID = "session.id"
 GEN_AI_CONVERSATION_ID = "gen_ai.conversation.id"
 ERROR_TYPE = "error.type"
+GEN_AI_INPUT_MESSAGES = "gen_ai.input.messages"
+GEN_AI_OUTPUT_MESSAGES = "gen_ai.output.messages"
 
 
 def load_api_url(environ: Mapping[str, str]) -> str:
@@ -55,10 +62,12 @@ def load_api_url(environ: Mapping[str, str]) -> str:
 API_URL = load_api_url(os.environ)
 
 
-def use_tracer_provider(provider: TracerProvider) -> None:
-    """Make the client's spans with `provider`."""
-    global tracer
+def use_tracer_provider(provider: TracerProvider, *, capture_content: bool = False) -> None:
+    """Make the client's spans with `provider`; with `capture_content`, put the
+    turn's message and replies on them."""
+    global tracer, _capture_content
     tracer = provider.get_tracer(__name__)
+    _capture_content = capture_content
 
 
 class ApiError(Exception):
@@ -92,6 +101,14 @@ def request_attributes(http: httpx2.AsyncClient, conversation_id: UUID) -> dict[
     }
 
 
+def text_messages(role: str, texts: list[str]) -> str:
+    """GenAI semconv messages, one text part each, in the JSON shape of the
+    API's turn span (its `span_content.text_messages`)."""
+    messages = [{"role": role, "parts": [{"type": "text", "content": t}]} for t in texts]
+    # Customer text is Portuguese: keep accents readable in Langfuse.
+    return json.dumps(messages, ensure_ascii=False)
+
+
 def mark_failed(span: Span, error: ApiError) -> None:
     """Record a failed post on the client span. A successful one stays UNSET."""
     span.set_status(StatusCode.ERROR)  # no description: it could echo a body
@@ -115,11 +132,17 @@ async def send_message(http: httpx2.AsyncClient, conversation_id: UUID, text: st
         # sets the status without one.
         set_status_on_exception=False,
     ) as span:
+        if _capture_content:
+            span.set_attribute(GEN_AI_INPUT_MESSAGES, text_messages("user", [text]))
         try:
-            return await _post(http, conversation_id, text, span)
+            replies = await _post(http, conversation_id, text, span)
         except ApiError as error:
+            # The input stays: a failed turn still shows what was asked.
             mark_failed(span, error)
             raise
+        if _capture_content:
+            span.set_attribute(GEN_AI_OUTPUT_MESSAGES, text_messages("assistant", replies))
+        return replies
 
 
 async def _post(

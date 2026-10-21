@@ -11,11 +11,20 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import SpanKind
 
-from fornada_simulator import simulate
+from fornada_simulator import client, simulate
 from fornada_simulator.personas import PERSONAS
+from fornada_simulator.scenarios import plan_matrix
 from fornada_simulator.settings import SimulatorSettings
-from fornada_simulator.simulate import END_MARKER, plan_jobs, run_batch, run_conversation
-from fornada_simulator.transcript import read_jsonl
+from fornada_simulator.simulate import (
+    END_MARKER,
+    MATRIX_END_RULE,
+    build_system_prompt,
+    plan_jobs,
+    run_batch,
+    run_conversation,
+    run_matrix,
+)
+from fornada_simulator.transcript import cell_key, latest_per_cell, read_jsonl
 
 pytestmark = pytest.mark.anyio
 
@@ -56,8 +65,8 @@ def api(
         seen.append(request)
         return (handler or default)(request)
 
-    client = httpx2.AsyncClient(base_url="http://api", transport=httpx2.MockTransport(respond))
-    return client, seen
+    http = httpx2.AsyncClient(base_url="http://api", transport=httpx2.MockTransport(respond))
+    return http, seen
 
 
 async def test_first_message_is_posted_under_a_new_uuid4() -> None:
@@ -253,6 +262,23 @@ class TwoTurnModel:
         return AIMessage("oi" if len(input) < 4 else f"tchau {END_MARKER}")
 
 
+async def test_capture_never_exports_the_persona_goal(
+    spans: InMemorySpanExporter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(client, "_capture_content", True)
+    http, _ = api()
+    async with http:
+        await run_conversation(
+            PERSONA, GOAL, http, ScriptedModel(["oi", END_MARKER]), max_turns=5, run_id="r"
+        )
+
+    found = [s for s in spans.get_finished_spans() if s.kind is SpanKind.CLIENT]
+    assert found
+    for span in found:
+        assert "gen_ai.input.messages" in (span.attributes or {})
+        assert all(GOAL not in str(value) for value in (span.attributes or {}).values())
+
+
 async def test_concurrent_conversations_keep_their_own_traces(
     tmp_path: Path, spans: InMemorySpanExporter
 ) -> None:
@@ -276,3 +302,142 @@ async def test_concurrent_conversations_keep_their_own_traces(
             attributes["fornada.simulator.persona.id"] == persona_of[str(attributes["session.id"])]
         )
         assert attributes["fornada.simulator.run.id"] == "run-1"
+
+
+# --- matrix --------------------------------------------------------------------
+
+
+class EndingModel:
+    async def ainvoke(self, input: list[BaseMessage], /) -> BaseMessage:
+        return AIMessage(f"oi {END_MARKER}")
+
+
+async def test_matrix_records_each_cell(tmp_path: Path) -> None:
+    cells = plan_matrix()[:5]
+    run_id, transcripts = await run_matrix(
+        settings(),
+        EndingModel(),
+        cells,
+        runs_dir=tmp_path,
+        transport=httpx2.MockTransport(replies_ok),
+    )
+    recorded = read_jsonl(tmp_path / f"{run_id}.jsonl")
+    assert len(transcripts) == 5
+    assert [cell_key(t) for t in recorded] == [cell.key for cell in cells]
+    assert [t.goal for t in recorded] == [cell.goal for cell in cells]
+
+
+async def test_resume_plays_only_the_missing_cells(tmp_path: Path) -> None:
+    cells = plan_matrix()[:10]
+    await run_matrix(
+        settings(),
+        EndingModel(),
+        cells,
+        runs_dir=tmp_path,
+        run_id="run",
+        limit=4,
+        transport=httpx2.MockTransport(replies_ok),
+    )
+    _, resumed = await run_matrix(
+        settings(),
+        EndingModel(),
+        cells,
+        runs_dir=tmp_path,
+        run_id="run",
+        transport=httpx2.MockTransport(replies_ok),
+    )
+    assert [cell_key(t) for t in resumed] == [cell.key for cell in cells[4:]]
+    recorded = read_jsonl(tmp_path / "run.jsonl")
+    assert sorted(cell_key(t) for t in recorded) == sorted(cell.key for cell in cells)
+
+
+async def test_resume_replays_a_failed_cell(tmp_path: Path) -> None:
+    cells = plan_matrix()[:3]
+
+    def fail_second_cell(request: httpx2.Request) -> httpx2.Response:
+        nonlocal posts
+        posts += 1
+        return httpx2.Response(503) if posts == 2 else replies_ok(request)
+
+    posts = 0
+    await run_matrix(
+        settings(),
+        EndingModel(),
+        cells,
+        runs_dir=tmp_path,
+        run_id="run",
+        transport=httpx2.MockTransport(fail_second_cell),
+    )
+    _, resumed = await run_matrix(
+        settings(),
+        EndingModel(),
+        cells,
+        runs_dir=tmp_path,
+        run_id="run",
+        transport=httpx2.MockTransport(replies_ok),
+    )
+    assert [cell_key(t) for t in resumed] == [cells[1].key]
+    latest = latest_per_cell(read_jsonl(tmp_path / "run.jsonl"))
+    assert len(latest) == 3
+    assert all(t.outcome == "completed" for t in latest)
+
+
+async def test_outage_cells_join_the_same_run(tmp_path: Path) -> None:
+    transport = httpx2.MockTransport(replies_ok)
+    first = plan_matrix(["nenhuma"])
+    await run_matrix(
+        settings(), EndingModel(), first, runs_dir=tmp_path, run_id="run", transport=transport
+    )
+    await run_matrix(
+        settings(),
+        EndingModel(),
+        plan_matrix(["ferramenta_fora"]),
+        runs_dir=tmp_path,
+        run_id="run",
+        transport=transport,
+    )
+    recorded = read_jsonl(tmp_path / "run.jsonl")
+    assert len(recorded) == 50
+    assert {t.complication_id for t in recorded} == {"nenhuma", "ferramenta_fora"}
+
+
+async def test_persona_batch_records_no_cell(tmp_path: Path) -> None:
+    transcripts = await run_batch(
+        settings(runs_per_persona=1),
+        EndingModel(),
+        runs_dir=tmp_path,
+        transport=httpx2.MockTransport(replies_ok),
+    )
+    assert all(t.intent_id is None and t.complication_id is None for t in transcripts)
+
+
+# The persona batch's instructions as they were before the matrix: `v0` ran with them.
+PERSONA_BATCH_PROMPT_TAIL = (
+    "- Quando a conversa terminar (você fechou, desistiu ou se despediu), "
+    f"termine a sua mensagem com {END_MARKER}."
+)
+
+
+def test_persona_batch_prompt_is_unchanged() -> None:
+    prompt = build_system_prompt(PERSONA, GOAL)
+    assert prompt.endswith(PERSONA_BATCH_PROMPT_TAIL)
+    assert MATRIX_END_RULE not in prompt
+
+
+def test_matrix_prompt_answers_before_ending() -> None:
+    prompt = build_system_prompt(PERSONA, GOAL, matrix=True)
+    assert prompt.endswith(MATRIX_END_RULE)
+    assert "responda" in MATRIX_END_RULE
+    assert "resolvido" in MATRIX_END_RULE and "desistido" in MATRIX_END_RULE
+
+
+async def test_matrix_conversation_gets_the_end_rule(tmp_path: Path) -> None:
+    model = ScriptedModel([f"oi {END_MARKER}"])
+    await run_matrix(
+        settings(),
+        model,
+        plan_matrix()[:1],
+        runs_dir=tmp_path,
+        transport=httpx2.MockTransport(replies_ok),
+    )
+    assert MATRIX_END_RULE in str(model.calls[0][0].content)

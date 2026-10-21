@@ -6,9 +6,13 @@ Message and reply text is never logged, only ids and failure kinds.
 Each post is one CLIENT span, the root of that turn's trace. Its context goes
 to the API in a `traceparent` header, so the API's spans join the trace (see
 the `client-tracing` spec). With tracing on, a `baggage` header carries only
-the persona id, a dimension of the API's metrics; the run id stays on the span.
+the persona id, a dimension of the API's metrics; the run id and the matrix
+cell stay on the span. With content capture on, the span also carries the
+turn's message and replies, which Langfuse shows as the trace's input and
+output; never the persona's goal, which only the simulator's model sees.
 """
 
+import json
 import logging
 from typing import Any, Literal
 from uuid import UUID
@@ -21,6 +25,8 @@ from opentelemetry.trace.status import StatusCode
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
+# Set by `setup_tracing`, so it stays off while tracing is off.
+_capture_content = False
 
 ApiErrorKind = Literal["timeout", "connect", "status", "bad_body"]
 
@@ -42,6 +48,16 @@ GEN_AI_CONVERSATION_ID = "gen_ai.conversation.id"
 ERROR_TYPE = "error.type"
 PERSONA_ID = "fornada.simulator.persona.id"
 RUN_ID = "fornada.simulator.run.id"
+INTENT_ID = "fornada.simulator.intent.id"
+COMPLICATION_ID = "fornada.simulator.complication.id"
+GEN_AI_INPUT_MESSAGES = "gen_ai.input.messages"
+GEN_AI_OUTPUT_MESSAGES = "gen_ai.output.messages"
+
+
+def use_content_capture(on: bool) -> None:
+    """Put the turn's message and replies on the client spans, or stop."""
+    global _capture_content
+    _capture_content = on
 
 
 class ApiError(Exception):
@@ -67,6 +83,8 @@ def request_attributes(
     conversation_id: UUID,
     persona_id: str | None,
     run_id: str | None,
+    intent_id: str | None = None,
+    complication_id: str | None = None,
 ) -> dict[str, Any]:
     """The client span's attributes, known before the request is sent."""
     attributes = {
@@ -81,7 +99,20 @@ def request_attributes(
         attributes[PERSONA_ID] = persona_id
     if run_id is not None:
         attributes[RUN_ID] = run_id
+    # The matrix cell; like the run id, never sent to the API.
+    if intent_id is not None:
+        attributes[INTENT_ID] = intent_id
+    if complication_id is not None:
+        attributes[COMPLICATION_ID] = complication_id
     return attributes
+
+
+def text_messages(role: str, texts: list[str]) -> str:
+    """GenAI semconv messages, one text part each, in the JSON shape of the
+    API's turn span (its `span_content.text_messages`)."""
+    messages = [{"role": role, "parts": [{"type": "text", "content": t}]} for t in texts]
+    # Customer text is Portuguese: keep accents readable in Langfuse.
+    return json.dumps(messages, ensure_ascii=False)
 
 
 def mark_failed(span: Span, error: ApiError) -> None:
@@ -102,23 +133,33 @@ async def send_message(
     *,
     persona_id: str | None = None,
     run_id: str | None = None,
+    intent_id: str | None = None,
+    complication_id: str | None = None,
 ) -> list[str]:
     """Post one customer message; return the attendant's reply texts, in order."""
     with tracer.start_as_current_span(
         SPAN_NAME,
         kind=SpanKind.CLIENT,
-        attributes=request_attributes(http, conversation_id, persona_id, run_id),
+        attributes=request_attributes(
+            http, conversation_id, persona_id, run_id, intent_id, complication_id
+        ),
         # Always a root: one trace per turn, whatever span is current.
         context=Context(),
         # The default description is the exception message; `mark_failed`
         # sets the status without one.
         set_status_on_exception=False,
     ) as span:
+        if _capture_content:
+            span.set_attribute(GEN_AI_INPUT_MESSAGES, text_messages("user", [text]))
         try:
-            return await _post(http, conversation_id, text, span, persona_id)
+            replies = await _post(http, conversation_id, text, span, persona_id)
         except ApiError as error:
+            # The input stays: a failed turn still shows what was asked.
             mark_failed(span, error)
             raise
+        if _capture_content:
+            span.set_attribute(GEN_AI_OUTPUT_MESSAGES, text_messages("assistant", replies))
+        return replies
 
 
 def outgoing_context(span: Span, persona_id: str | None) -> Context:

@@ -31,6 +31,8 @@ def test_one_parseable_line_with_every_field(tmp_path: Path) -> None:
     assert set(record) == {
         "run_id",
         "persona_id",
+        "intent_id",
+        "complication_id",
         "goal",
         "conversation_id",
         "outcome",
@@ -48,3 +50,29 @@ def test_appending_twice_gives_two_lines_that_read_back(tmp_path: Path) -> None:
     append_jsonl(path, second)
     assert len(path.read_text().splitlines()) == 2
     assert read_jsonl(path) == [first, second]
+
+
+def test_matrix_cell_round_trips(tmp_path: Path) -> None:
+    path = tmp_path / "matrix.jsonl"
+    transcript = make_transcript().model_copy(
+        update={"intent_id": "retirada", "complication_id": "data_lotada"}
+    )
+    append_jsonl(path, transcript)
+    record = json.loads(path.read_text())
+    assert (record["persona_id"], record["intent_id"], record["complication_id"]) == (
+        "apressada",
+        "retirada",
+        "data_lotada",
+    )
+    assert read_jsonl(path) == [transcript]
+
+
+def test_a_line_written_before_the_matrix_loads_with_no_cell(tmp_path: Path) -> None:
+    # The shape of the run files committed before the matrix existed.
+    record = json.loads(make_transcript().model_dump_json())
+    del record["intent_id"], record["complication_id"]
+    path = tmp_path / "old.jsonl"
+    path.write_text(json.dumps(record) + "\n")
+    (transcript,) = read_jsonl(path)
+    assert transcript.intent_id is None
+    assert transcript.complication_id is None

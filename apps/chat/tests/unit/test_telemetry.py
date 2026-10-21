@@ -35,6 +35,24 @@ def test_disabled_values(value: str) -> None:
     assert load_telemetry_settings({"TELEMETRY__ENABLED": value}).enabled is False
 
 
+def test_content_capture_is_off_by_default() -> None:
+    assert load_telemetry_settings({"TELEMETRY__ENABLED": "true"}).capture_content is False
+
+
+def test_content_capture_comes_from_the_environment() -> None:
+    settings = load_telemetry_settings(
+        {"TELEMETRY__ENABLED": "true", "TELEMETRY__CAPTURE_CONTENT": "true"}
+    )
+    assert settings.capture_content is True
+
+
+def test_content_capture_needs_tracing() -> None:
+    settings = load_telemetry_settings({"TELEMETRY__CAPTURE_CONTENT": "true"})
+    assert settings.enabled is False
+    assert settings.capture_content is False
+    assert setup_tracing(settings) is None
+
+
 def test_endpoint_comes_from_the_environment() -> None:
     settings = load_telemetry_settings({"TELEMETRY__OTLP_ENDPOINT": "http://collector:4318/"})
     assert settings.otlp_endpoint == "http://collector:4318"

@@ -52,10 +52,11 @@ venv = ".venv"
 addopts = "-ra --strict-markers --import-mode=importlib"
 testpaths = ["tests"]
 
-# Run from apps/simulator: `uv run task <name>`. `batch` runs from the repo root
+# Run from apps/simulator: `uv run task <name>`. `batch` and `matrix` run from the repo root
 # so the app finds the root `.env`.
 [tool.taskipy.tasks]
 batch = { cmd = "python -m fornada_simulator", cwd = "../.." }
+matrix = { cmd = "python -m fornada_simulator.matrix", cwd = "../.." }
 test = "pytest"
 lint = "ruff check"
 "lint:fix" = "ruff check --fix"

@@ -2,8 +2,9 @@
 # `edot-collector` service (.devcontainer/compose.yaml).
 #
 # Traces fan out from one OTLP receiver to two pipelines, over the compose
-# network: Langfuse (the LLM view) gets every span as the app sent it, with
-# conversation content; Elasticsearch (Kibana APM) gets them redacted, with no
+# network: Langfuse (the LLM view) gets every span with the content the app
+# sent, infrastructure spans at DEBUG level and a turn's root named `turn`;
+# Elasticsearch (Kibana APM) gets them redacted, with no
 # content and the customer phone only as a salted hash. Logs go to
 # Elasticsearch only (Langfuse takes traces), with the same redaction. The
 # app's metrics also go to Elasticsearch only (Langfuse has no OTLP metrics
@@ -70,6 +71,27 @@ processors:
       # passed on (SHA256 would fail on it).
       - delete_key(span.attributes, "fornada.customer.phone") where span.attributes["fornada.customer.phone"] != nil and not IsString(span.attributes["fornada.customer.phone"])
 
+  # Presentation for Langfuse only (langfuse-trace-readability, design.md,
+  # decisions 1 and 2). It runs in `traces/langfuse`, so Elasticsearch gets
+  # the spans with their names and no level attribute.
+  transform/langfuse_view:
+    # Fail open, unlike the redaction: a statement error only costs the view,
+    # so the span goes to Langfuse unmarked instead of dropping the batch.
+    error_mode: ignore
+    trace_statements:
+      # Infrastructure spans (HTTP, FastAPI, SQL) to Langfuse's DEBUG level,
+      # which the trace tree hides by default, hanging their children on the
+      # nearest visible ancestor. Kept visible: roots, GenAI operations
+      # (`invoke_agent`, `chat`, `execute_tool`) and failed spans, which are
+      # what an error analysis looks for.
+      # A root's `parent_span_id.string` is sixteen zeros, not "": the getter
+      # hex-encodes the 8-byte id (ottl ctxspan, v0.161.0). Compared as a
+      # string because OTTL has no comparison rule for SpanID values.
+      - set(span.attributes["langfuse.observation.level"], "DEBUG") where span.parent_span_id.string != "0000000000000000" and span.attributes["gen_ai.operation.name"] == nil and span.status.code != STATUS_CODE_ERROR
+      # A turn's root (the chat's or the simulator's CLIENT span) is named
+      # after the HTTP route; Langfuse lists traces by the root's name.
+      - set(span.name, "turn") where span.parent_span_id.string == "0000000000000000" and span.attributes["url.template"] == "/conversations/{conversation_id}/messages"
+
   # Same rules as `transform/redact`, for log records. The app puts none of
   # these attributes on a log today; the statements keep the guarantee true per
   # signal, so a future `extra={"fornada.customer.phone": ...}` is hashed
@@ -101,8 +123,9 @@ service:
   pipelines:
     traces/langfuse:
       receivers: [otlp]
-      # No processors: the app already batches spans and otlp_http queues and
-      # retries on its own.
+      # Only the view: no batching, since the app already batches spans and
+      # otlp_http queues and retries on its own.
+      processors: [transform/langfuse_view]
       exporters: [otlp_http/langfuse]
 
     # Same receiver, second pipeline: this is the fan-out. The Collector
