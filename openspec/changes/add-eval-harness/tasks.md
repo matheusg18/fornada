@@ -23,7 +23,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 4: the deterministic asser
 
 ## 3. Per-case isolation
 
-- [ ] 3.1 Write failing integration tests in `apps/evals/tests/integration/test_isolation.py`, skipped without `DATABASE_URI` like the API's:
+- [x] 3.1 Write failing integration tests in `apps/evals/tests/integration/test_isolation.py`, skipped without `DATABASE_URI` like the API's:
   - a schema gets the seed (12 products, run day +3 with 0 free kg);
   - an order written in one schema is invisible in another and in `public`;
   - the schema is dropped after the run, also when the run raises;
@@ -31,7 +31,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 4: the deterministic asser
   - the run day equals the database's `CURRENT_DATE`.
 
   Verify they fail.
-- [ ] 3.2 Implement `fornada_evals.isolation` (design.md, decision 3): an async context manager that yields the run day and an `async_sessionmaker` bound to the case's schema (with `hide_parameters=True`), plus `sweep()`. Verify 3.1 passes and that `public`'s order count is unchanged before and after the tests.
+- [x] 3.2 Implement `fornada_evals.isolation` (design.md, decision 3): an async context manager that yields the run day and an `async_sessionmaker` bound to the case's schema (with `hide_parameters=True`), plus `sweep()`. Verify 3.1 passes and that `public`'s order count is unchanged before and after the tests.
 
 ## 4. Runner
 

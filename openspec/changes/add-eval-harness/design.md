@@ -9,7 +9,7 @@
   - Tool errors come back as `ToolMessage(status="error")`.
   - The prompt has not changed since the `v0` tag (only instrumentation and chaos mode were added to tools and graph since), so a baseline run on the current code measures `v0`'s behavior.
 - **The database.**
-  - The seed dates everything from `CURRENT_DATE` when it is loaded. It fills run day +3 and +4, and the server's time zone is UTC.
+  - The seed dates everything from `CURRENT_DATE` when it is loaded. It fills run day +3 and +4. The server runs in UTC, but `seed.sql` sets its session to `America/Sao_Paulo` first, so `CURRENT_DATE` is the Brazilian date.
   - `schema.sql` creates unqualified tables, so it loads into whatever `search_path` names. The `fornada` role owns the database and can create schemas, but it cannot create databases. Loading `schema.sql` and `seed.sql` into a fresh schema takes about 0.26 s.
   - The graph's `ToolNode` runs a turn's tool calls concurrently (`asyncio.gather`). Phase 3 saw 7 parallel `check_capacity` calls, so a single shared connection rolled back at the end (`rollback_sessionmaker` in the API's integration tests) would break under concurrent sessions.
 - **DeepEval 4.3.1** (2026-10-16), read from its docs and its installed source:
@@ -103,7 +103,7 @@ For each run of a case:
 A session-start sweep drops `eval_*` schemas left by a killed run.
 
 - Each run has its own copy of the seed, so parallel tool calls and xdist workers are safe, and `public` is never touched (spec: "Each case runs in isolation").
-- The run day comes from the database, not from `America/Sao_Paulo`. The seed is dated from the server's UTC `CURRENT_DATE`, and the two disagree from 21:00 to 24:00 in Brazil. The tools get `FixedClock(run_day)`, so the agent's lead-time math and the seed's full days line up.
+- The run day comes from the database, read in the session that loaded the seed. `seed.sql` sets that session to `America/Sao_Paulo`, so the run day is the date the seed counted from, even from 21:00 to 24:00 in Brazil, when a new UTC session's `CURRENT_DATE` is already the next day. The tools get `FixedClock(run_day)`, so the agent's lead-time math and the seed's full days line up.
 - The engine keeps the API's `hide_parameters=True`.
 
 *Alternatives:*
