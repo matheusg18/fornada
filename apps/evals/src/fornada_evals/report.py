@@ -16,10 +16,12 @@ from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from deepeval.test_case import ConversationalTestCase
 from pydantic import BaseModel
+
+if TYPE_CHECKING:  # the reporter itself never imports DeepEval
+    from deepeval.test_case import ConversationalTestCase
 
 APP_DIR = Path(__file__).parents[2]
 REPORTS_DIR = APP_DIR / "reports"
@@ -58,7 +60,7 @@ class RunResult(BaseModel):
 
 
 def run_result(
-    test_case: ConversationalTestCase, run_id: str, checks: dict[str, CheckResult]
+    test_case: "ConversationalTestCase", run_id: str, checks: dict[str, CheckResult]
 ) -> RunResult:
     """The result line for a case run by `run_case` and measured by its checks."""
     metadata = test_case.metadata or {}
