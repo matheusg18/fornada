@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 
 from fornada_evals.report import (
+    CheckResult,
     Gate,
     RunResult,
     load_runs,
@@ -36,7 +37,7 @@ def run(
         category="DATE",
         critical=critical,
         run_index=run_index,
-        checks={"no_past_date": {"passed": passed, "reason": None if passed else REASON}},
+        checks={"no_past_date": CheckResult(passed=passed, reason=None if passed else REASON)},
         failed=False,
         error=None,
         latencies_ms=latencies_ms if latencies_ms is not None else [1000.0],
@@ -117,7 +118,9 @@ class TestGate:
             min_noncritical_rate=None, max_cost_per_run_usd=0.05, max_p95_turn_latency_s=None
         )
 
-        summary = summarize([run(cost=0.06), run("other", cost=0.06)], gate)
+        summary = summarize(
+            [run(critical=False, cost=0.06), run("other", critical=False, cost=0.06)], gate
+        )
 
         assert summary["cost"]["mean_per_run_usd"] == pytest.approx(0.06)
         assert summary["gate"]["failures"] == ["cost"]
@@ -125,12 +128,12 @@ class TestGate:
     def test_p95_above_ceiling_fails(self) -> None:
         gate = Gate(min_noncritical_rate=None, max_cost_per_run_usd=None, max_p95_turn_latency_s=5)
 
-        summary = summarize([run(latencies_ms=[1000.0, 6000.0])], gate)
+        summary = summarize([run(critical=False, latencies_ms=[1000.0, 6000.0])], gate)
 
         assert summary["gate"]["failures"] == ["p95 latency"]
 
     def test_empty_ceilings_report_without_gating(self) -> None:
-        summary = summarize([run(cost=9.0, latencies_ms=[60_000.0])], NO_GATE)
+        summary = summarize([run(critical=False, cost=9.0, latencies_ms=[60_000.0])], NO_GATE)
 
         assert summary["gate"]["passed"] is True
         assert summary["cost"]["max_usd"] is None
