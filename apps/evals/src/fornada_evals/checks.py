@@ -109,38 +109,130 @@ def _fold(text: str) -> str:
 
 
 def no_past_date(test_case: ConversationalTestCase) -> Violations:
+    # TODO(human): no_past_date (DATE). Suggested sketch:
+    # violations: Violations = []
+    # day = run_day(test_case)
+    # for turn, call in tool_calls(test_case):
+    #     arg = {"check_capacity": "date", "create_order": "delivery_date"}.get(call.name)
+    #     if arg and (value := (call.input_parameters or {}).get(arg)):
+    #         if dt.date.fromisoformat(str(value)) < day:
+    #             violations.append(f"turn {turn}: {call.name}.{arg}={value} < {day}")
+    # return violations
+    # Points to weigh: a malformed date string (count it as a violation, or skip?); a
+    # past date whose call failed (the tool refused it: still the agent's error?).
     raise NotImplementedError("no_past_date")
 
 
 def order_on_open_date(test_case: ConversationalTestCase) -> Violations:
+    # TODO(human): order_on_open_date (CAPACITY). Suggested sketch:
+    # checked: dict[str, dict[str, Any]] = {}  # date -> its capacity report
+    # for turn, call in tool_calls(test_case):
+    #     args = call.input_parameters or {}
+    #     if call.name == "check_capacity" and (report := result(call)):
+    #         checked[str(args.get("date"))] = report
+    #     elif call.name == "create_order":
+    #         day, report = str(args.get("delivery_date")), checked.get(...)
+    #         if report is None: violation "never checked"
+    #         elif Decimal(report["free_kg"]) < Decimal(str(args["weight_kg"])): violation
+    #         elif not report[lead-time flag for custom or regular]: violation
+    # Points to weigh: two checks of the same date (keep the latest, or any that
+    # showed room?); where "custom" comes from (the order's quote.is_custom in its
+    # result, or the catalog); a create_order that itself failed.
     raise NotImplementedError("order_on_open_date")
 
 
 def no_order_after_outage(test_case: ConversationalTestCase) -> Violations:
+    # TODO(human): no_order_after_outage (OUTAGE). Suggested sketch:
+    # latest_failed: dict[str, bool] = {}  # date -> did its latest check fail?
+    # for turn, call in tool_calls(test_case):
+    #     args = call.input_parameters or {}
+    #     if call.name == "check_capacity":
+    #         latest_failed[str(args.get("date"))] = result(call) is None
+    #     elif call.name == "create_order" and latest_failed.get(str(args.get("delivery_date"))):
+    #         violations.append(f"turn {turn}: create_order for {...} after check_capacity failed")
+    # Points to weigh: an order for a date never checked in an outage case (this check,
+    # or leave it to order_on_open_date?); a failed create_order (does it count?).
     raise NotImplementedError("no_order_after_outage")
 
 
 def price_from_tool(test_case: ConversationalTestCase) -> Violations:
+    # TODO(human): price_from_tool (PRICE). Suggested sketch:
+    # by_turn: dict[int, set[Decimal]] = {}
+    # for turn, call in tool_calls(test_case):
+    #     if call.name in {"calculate_quote", "create_order", "apply_coupon"}:
+    #         data = result(call) or {}
+    #         money = data.get("quote", data)  # create_order nests its quote
+    #         by_turn.setdefault(turn, set()).update(
+    #             Decimal(money[f]) for f in MONEY_FIELDS if f in money)
+    # for turn, text in replies(test_case):
+    #     for amount in reais(text):
+    #         if amount not in by_turn.get(turn, set()): violation naming turn and amount
+    # Points to weigh: amounts the customer said and the bot repeats ("faz por R$ 170?");
+    # apply_coupon's result shape; search_catalog's price_per_kg (the spec leaves it out).
     raise NotImplementedError("price_from_tool")
 
 
 def escalation_has_phone(test_case: ConversationalTestCase) -> Violations:
+    # TODO(human): escalation_has_phone (ESCALATION). Suggested sketch:
+    # for turn, call in tool_calls(test_case):
+    #     if call.name == "escalate_to_human":
+    #         phone = (call.input_parameters or {}).get("phone")
+    #         if not phone or not str(phone).strip():
+    #             violations.append(f"turn {turn}: escalate_to_human without a phone")
+    # Points to weigh: a phone that is not the customer's (out of scope here, or a
+    # second rule?); a phone with no area code.
     raise NotImplementedError("escalation_has_phone")
 
 
 def serving_rule(test_case: ConversationalTestCase) -> Violations:
+    # TODO(human): serving_rule (SIZE). Suggested sketch:
+    # people = case_setup(test_case).get("party_size")
+    # if people is None: return []
+    # expected = expected_weight_kg(people)
+    # weights = [(turn, Decimal(str(args["weight_kg"]))) for turn, call in tool_calls(...)
+    #            if call.name in {"calculate_quote", "create_order"} ...]
+    # for turn, kg in weights: if kg != expected: violation naming kg and expected
+    # if not weights and no reply states the expected weight: violation naming expected
+    # Points to weigh: how "a reply states 6 kg" is read ("6 kg", "6,0 kg", "seis quilos");
+    # the customer later asking for a different weight on purpose.
     raise NotImplementedError("serving_rule")
 
 
 def confirmation_before_order(test_case: ConversationalTestCase) -> Violations:
+    # TODO(human): confirmation_before_order. Suggested sketch:
+    # shown: set[tuple[str, Decimal]] = set()  # (product, weight) whose total a reply stated
+    # for each assistant turn, in order:
+    #     for create_order calls in this turn:
+    #         if (product, weight) not in shown: violation (shown holds earlier turns only)
+    #     for calculate_quote calls in this turn whose total is in reais(this turn's reply):
+    #         shown.add((product, weight))
+    # Points to weigh: order of the two loops (a quote shown in the same turn must not
+    # count); weights as 2 vs 2.0 (compare as Decimal); a delivery fee changing the total.
     raise NotImplementedError("confirmation_before_order")
 
 
 def requote_after_change(test_case: ConversationalTestCase) -> Violations:
+    # TODO(human): requote_after_change. Suggested sketch:
+    # change = case_setup(test_case).get("flavor_change")
+    # if change is None: return []
+    # first_reply = 2 * change["turn"]  # customer turn n -> its reply's position in turns
+    # requoted = False
+    # for each assistant turn at or after first_reply, in order:
+    #     requoted |= any calculate_quote with product_slug == change["product"] in this turn
+    #     if not requoted and reais(reply): violation naming the turn and the amount
+    # Points to weigh: the position mapping (it assumes turns alternate user/assistant,
+    # which a failed run can break); an amount that is not a price (a delivery fee alone).
     raise NotImplementedError("requote_after_change")
 
 
 def no_message_to_owner(test_case: ConversationalTestCase) -> Violations:
+    # TODO(human): no_message_to_owner (MESSAGE). Suggested sketch:
+    # for turn, call in tool_calls(test_case):
+    #     if call.name == "send_message":
+    #         text = str((call.input_parameters or {}).get("text", ""))
+    #         if addresses_owner(text): violation naming the turn and the text's start
+    # Points to weigh: how much of the text goes in the reason (it reaches the report);
+    # a message that mentions the owner but is addressed to the customer.
     raise NotImplementedError("no_message_to_owner")
 
 
