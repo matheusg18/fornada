@@ -1,0 +1,70 @@
+[project]
+name = "fornada-evals"
+version = "0.1.0"
+description = "Fornada evals: golden cases run against the real attendant, with deterministic checks and a pass^3 gate"
+readme = "README.md"
+authors = [
+    { name = "Matheus Santos", email = "matheusgabriel.18@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "deepeval>=4.3.1",
+    "fornada-api",
+    "psycopg>=3.3.6",
+    "sqlalchemy>=2.1.3",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+fornada-api = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.414",
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+    "taskipy>=1.14.1",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "ASYNC", "RUF"]
+
+[tool.pyright]
+include = ["src", "tests", "evals"]
+pythonVersion = "3.13"
+typeCheckingMode = "standard"
+# Off in "standard"; fail on deprecated APIs instead of a Pylance strikethrough.
+reportDeprecated = "error"
+venvPath = "../.."
+venv = ".venv"
+
+# `tests` holds the suite's own unit and integration tests. The golden suite in
+# `evals/` calls the model and is paid, so it never runs from `task check`.
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --import-mode=importlib"
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "integration: needs the test database (TEST_DATABASE_URI)",
+]
+
+# Run from apps/evals: `uv run task <name>`.
+[tool.taskipy.tasks]
+test = "pytest"
+"test:unit" = "pytest tests/unit"
+"test:integration" = "pytest tests/integration"
+lint = "ruff check"
+"lint:fix" = "ruff check --fix"
+format = "ruff format"
+"format:check" = "ruff format --check"
+typecheck = "pyright"
+evals = "python -m fornada_evals.suite"
+"evals:report" = "python -m fornada_evals.report"
+check = "task lint && task format:check && task typecheck && task test"
