@@ -1,11 +1,13 @@
 import datetime as dt
 import json
+import typing
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from fornada_evals.dataset import DatasetError, load_cases, render
+from fornada_evals.checks import CHECKS
+from fornada_evals.dataset import CheckId, DatasetError, load_cases, render
 
 RUN_DAY = dt.date(2026, 10, 21)  # a Wednesday
 
@@ -118,3 +120,7 @@ class TestRender:
         text = "bolo {de chocolate} e {d+3} e {x:dd/mm}"
 
         assert render(text, RUN_DAY) == text
+
+
+def test_dataset_accepts_exactly_the_registered_checks() -> None:
+    assert set(typing.get_args(CheckId.__value__)) == set(CHECKS)
