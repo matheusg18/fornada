@@ -58,7 +58,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 4: the deterministic asser
 
 ## 6. Golden dataset
 
-- [ ] 6.1 Draft about 30 cases in `apps/evals/datasets/golden.jsonl` following the mix in design.md, decision 11. Each case cites its open code `#n`, uses date placeholders, and keeps self-contained turns (product, weight or party size, date, pickup or delivery, name, phone), 1–4 turns, in Brazilian Portuguese. Every case gets `"critical": null`. Verify every line parses as JSON and the loader's only error is the `null` critical mark.
+- [x] 6.1 Draft about 30 cases in `apps/evals/datasets/golden.jsonl` following the mix in design.md, decision 11. Each case cites its open code `#n`, uses date placeholders, and keeps self-contained turns (product, weight or party size, date, pickup or delivery, name, phone), 1–4 turns, in Brazilian Portuguese. Every case gets `"critical": null`. Verify every line parses as JSON and the loader's only error is the `null` critical mark.
 - [ ] 6.2 `TODO(human)`: the maintainer marks each case `critical: true` or `false` (the suggestion: the cases behind the final scenarios, which are full day, outage, 40 people and flavor change). Stop and wait; then verify the dataset loads and a unit test asserts that every final scenario this layer covers has at least one critical case.
 
 ## 7. Suite and reporter
