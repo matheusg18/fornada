@@ -63,7 +63,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 4: the deterministic asser
 
 ## 7. Suite and reporter
 
-- [ ] 7.1 Write failing unit tests in `apps/evals/tests/unit/test_report.py` for the reporter, on handmade result lines:
+- [x] 7.1 Write failing unit tests in `apps/evals/tests/unit/test_report.py` for the reporter, on handmade result lines:
   - a critical case with runs pass, pass, fail fails the gate;
   - 3 of 3 passes;
   - 7 of 10 non-critical cases against a 0.8 minimum fails and shows 70% against 80%;
