@@ -1,5 +1,5 @@
 # Versions are pinned exactly; Dependabot (.github/dependabot.yml) opens PRs to bump them.
-FROM ghcr.io/astral-sh/uv:0.13.1 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.6 AS uv
 
 FROM mcr.microsoft.com/devcontainers/base:2.2.3-trixie
 
