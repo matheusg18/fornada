@@ -1,0 +1,11 @@
+# Gate settings for the golden suite (fornada_evals.report). A missing key reports the
+# value without gating on it. Set them from the v0 baseline (design.md, decision 8).
+
+# Share of non-critical case runs that must pass every check, 0 to 1.
+# min_noncritical_rate = 0.8
+
+# Mean US$ per conversation run (the agent's model calls only).
+# max_cost_per_run_usd = 0.05
+
+# 95th percentile of turn latency across every run, in seconds (nearest rank).
+# max_p95_turn_latency_s = 15

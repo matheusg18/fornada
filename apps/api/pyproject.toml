@@ -59,7 +59,10 @@ venvPath = "../.."
 venv = ".venv"
 
 [tool.pytest.ini_options]
-addopts = "-ra --strict-markers --import-mode=importlib"
+# `deepeval` (installed for apps/evals, sharing this virtualenv) auto-loads its pytest
+# plugin; off here, since it creates `.deepeval/`, prints on teardown and opens a
+# telemetry scope in a suite with no evals.
+addopts = "-ra --strict-markers --import-mode=importlib -p no:deepeval"
 testpaths = ["tests"]
 # Lets tests import shared helpers, e.g. `tests.unit.services.fakes`.
 pythonpath = ["."]

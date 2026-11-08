@@ -227,6 +227,15 @@ Development happens inside the dev container (`.devcontainer/`). It is the sandb
 - **Database seed:** `.devcontainer/db/schema.sql` and `.devcontainer/db/seed.sql` load into `fornada` on the first start of an empty Postgres volume only. To reset a running database: `psql "$DATABASE_URI" -v ON_ERROR_STOP=1 -f .devcontainer/db/schema.sql -f .devcontainer/db/seed.sql` (see `.devcontainer/db/README.md`).
 - **Git over SSH:** VS Code forwards the host's SSH agent. The private key never enters the container.
 
+### Evals
+
+`apps/evals` runs the golden suite: scripted conversations from the phase 3 open codes, run against the real attendant and its configured model, scored by deterministic checks, with critical cases gated on pass^3. See `apps/evals/README.md`.
+
+- `uv run task evals` from `apps/evals` (one case: `-k <name>`), then `uv run task evals:report <run-id> [<run-id>…]` to report again or over several runs. Results, `report.md` and `summary.json` go to `apps/evals/reports/<run-id>/` (gitignored); the exit status is 1 when the gate fails. Ceilings live in `apps/evals/gate.toml`.
+- It calls the model (about US$ 0.90 a full run), so it is not part of any `task check`; the app's `task check` runs only the suite's own tests.
+- DeepEval's telemetry is off (`DEEPEVAL_TELEMETRY_OPT_OUT=1`) and no `CONFIDENT_API_KEY` is set: the model provider is the only third party it calls.
+- Each case run gets its own schema `eval_<hex>` in the test database (`TEST_DATABASE_URI`), seeded on Monday 2026-03-09 and dropped afterwards. The suite refuses to start without the variable. At the start it sweeps `eval_*` schemas left by a killed run, so run one suite at a time.
+
 ### Environment files
 
 Keep these two apart. They hold different things for different consumers.

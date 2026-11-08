@@ -36,3 +36,7 @@ apps/chat/.chainlit/translations/
 
 # Persona simulator transcripts (simulated, regenerable)
 apps/simulator/runs/
+
+# DeepEval's local cache and the eval suite's run reports (regenerable)
+.deepeval/
+apps/evals/reports/
