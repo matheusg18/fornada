@@ -82,8 +82,8 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 4: the deterministic asser
 
 ## 8. `v0` baseline
 
-- [ ] 8.1 Run the full suite twice on this commit (the prompt has not changed since `v0`) and record the cost of both runs. Verify both run folders have a `report.md`.
-- [ ] 8.2 Run the reporter over both run ids and write `docs/evals/v0-baseline.md`:
+- [x] 8.1 Run the full suite twice on this commit (the prompt has not changed since `v0`) and record the cost of both runs. Verify both run folders have a `report.md`.
+- [x] 8.2 Run the reporter over both run ids and write `docs/evals/v0-baseline.md`:
   - the prompt version and model;
   - per-category results;
   - pass^3 per critical case and the non-critical rate;
