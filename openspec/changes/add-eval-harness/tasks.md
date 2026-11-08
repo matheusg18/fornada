@@ -93,7 +93,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 4: the deterministic asser
   - a comparison with the phase 3 counts for the same categories.
 
   Verify every number in the file comes from the two `summary.json` files.
-- [ ] 8.3 Present the baseline to the maintainer for the gate thresholds in `gate.toml` (a core decision, not a `TODO(human)` in code) and record the chosen values and their reason in `docs/evals/v0-baseline.md`. Verify the reporter over the baseline runs applies them and reports the expected gate result: `v0` is expected to fail.
+- [x] 8.3 Present the baseline to the maintainer for the gate thresholds in `gate.toml` (a core decision, not a `TODO(human)` in code) and record the chosen values and their reason in `docs/evals/v0-baseline.md`. Verify the reporter over the baseline runs applies them and reports the expected gate result: `v0` is expected to fail.
 
 ## Workflow follow-up
 

@@ -141,4 +141,13 @@ The MESSAGE and ESCALATION cases do not provoke the phase 3 failure reliably. A 
 
 ## 9. Gate thresholds
 
-<!-- Filled in task 8.3 with the maintainer's chosen values for gate.toml and their reason. -->
+Chosen by the maintainer from this baseline, in `apps/evals/gate.toml`:
+
+| Setting | Value | `v0` | Reason |
+|---|---|---|---|
+| Critical cases | pass^3 on all 10 | 0/10 | Fixed by the design (AGENTS.md: gate on pass^3) |
+| `min_noncritical_rate` | 0.8 | 0.41 | The target, not a floor under `v0`: each fix raises the rate until it passes. 0.5 would sit inside the 36–45% run-to-run noise |
+| `max_cost_per_run_usd` | 0.02 | 0.0147 | About 35% headroom for the date in the agent's state and later checks. A prompt that doubles token use fails |
+| `max_p95_turn_latency_s` | 10 | 7.4 | The same headroom as cost. Doubling p95 fails |
+
+With these values, the combined report fails on critical cases and on the non-critical rate, and passes cost and latency, as expected for `v0`.
