@@ -171,7 +171,7 @@ services:
 
   clickhouse:
     # Langfuse v4 requires ClickHouse >= 25.12.
-    image: docker.io/clickhouse/clickhouse-server:26.9.16.11
+    image: docker.io/clickhouse/clickhouse-server:26.10.3.7
     restart: unless-stopped
     user: "101:101"
     environment:
@@ -190,7 +190,7 @@ services:
 
   valkey:
     # Redis-compatible; Langfuse supports Valkey >= 8.
-    image: docker.io/valkey/valkey:9.1.2-alpine
+    image: docker.io/valkey/valkey:9.1.3-alpine
     restart: unless-stopped
     # Queue jobs must never be evicted.
     command: valkey-server --requirepass ${VALKEY_PASSWORD:?} --maxmemory-policy noeviction
@@ -204,7 +204,7 @@ services:
 
   minio:
     # Chainguard's free tier only publishes `latest`, so it is pinned by digest.
-    image: cgr.dev/chainguard/minio:latest@sha256:2136d593beacf4461187035eca949fe49abd589d5079735025c711ca58fee0c8
+    image: cgr.dev/chainguard/minio:latest@sha256:3c60a2a8c4d33409a9bc7a623a7fcbfb4605adc3d89422d2f53b3f673a6e5597
     restart: unless-stopped
     entrypoint: sh
     # Create the `langfuse` bucket before starting the server.
@@ -228,7 +228,7 @@ services:
     # OTLP on edot-collector:4317 (gRPC) and :4318 (HTTP), internal metrics on
     # :8888, all reachable from `dev` by service name. No port is published to
     # the host.
-    image: docker.elastic.co/elastic-agent/elastic-otel-collector:9.5.5
+    image: docker.elastic.co/elastic-agent/elastic-otel-collector:9.5.6
     restart: unless-stopped
     command: ["--config", "/etc/otelcol/config.yaml"]
     # The Elasticsearch exporter logs in as `otel_collector`, which
@@ -255,7 +255,7 @@ services:
     # (answers 401 without credentials). No port is published to the host; use
     # Kibana's Dev Tools. Setting security explicitly turns off the image's
     # auto-configuration (generated certificates, enrollment tokens).
-    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.5
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.6
     restart: unless-stopped
     environment:
       discovery.type: single-node
@@ -298,7 +298,7 @@ services:
     # Every call is a PUT/POST of the full state, so it runs on every start and
     # also repairs a volume whose passwords came from older secrets. Uses the
     # Elasticsearch image for its curl.
-    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.5
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.6
     restart: "no"
     depends_on:
       elasticsearch:
@@ -321,7 +321,7 @@ services:
     # Connects as `kibana_system` (Kibana refuses the `elastic` superuser).
     # Log in at http://localhost:5601 as `elastic`. The first start takes 1-2
     # minutes; `dev` does not wait for it.
-    image: docker.elastic.co/kibana/kibana:9.5.5
+    image: docker.elastic.co/kibana/kibana:9.5.6
     restart: unless-stopped
     depends_on:
       elasticsearch-setup:
@@ -361,7 +361,7 @@ services:
     # Nothing depends on it: `dev` never waits for Kibana, and a failed import
     # only shows in this service's logs (`docker compose logs kibana-setup`).
     # Uses the Elasticsearch image for its curl, like elasticsearch-setup.
-    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.5
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.6
     restart: "no"
     depends_on:
       kibana:
@@ -386,7 +386,7 @@ services:
     # Smoke test for the Collector: sends 5 synthetic traces (2 spans each) and
     # exits. Behind a profile, so it never starts with the dev environment. Run
     # it from the host (see AGENTS.md, "Dev environment").
-    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.163.0
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.164.1
     profiles: [smoke-test]
     depends_on:
       - edot-collector
