@@ -40,8 +40,8 @@ def test_golden(case: GoldenCase, run_index: int, database_url: str, results_fil
     # A non-critical case gates on the rate in the report; in pytest it only warns.
     test_case.flaky = not case.metadata.critical
 
-    # The verdicts for the result line come from our own instances: `assert_test` scores
-    # copies of the metrics it is given, and raises before we could read them.
+    # The verdicts for the result line come from our own instances, measured first:
+    # `assert_test` raises on a failed metric before we could read it.
     checks: dict[str, CheckResult] = {}
     for metric in _metrics(case):
         try:
