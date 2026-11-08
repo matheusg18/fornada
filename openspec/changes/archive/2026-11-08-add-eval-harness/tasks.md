@@ -82,8 +82,8 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 4: the deterministic asser
 
 ## 8. `v0` baseline
 
-- [ ] 8.1 Run the full suite twice on this commit (the prompt has not changed since `v0`) and record the cost of both runs. Verify both run folders have a `report.md`.
-- [ ] 8.2 Run the reporter over both run ids and write `docs/evals/v0-baseline.md`:
+- [x] 8.1 Run the full suite twice on this commit (the prompt has not changed since `v0`) and record the cost of both runs. Verify both run folders have a `report.md`.
+- [x] 8.2 Run the reporter over both run ids and write `docs/evals/v0-baseline.md`:
   - the prompt version and model;
   - per-category results;
   - pass^3 per critical case and the non-critical rate;
@@ -93,7 +93,7 @@ Tasks marked `TODO(human)` are core (AGENTS.md, phase 4: the deterministic asser
   - a comparison with the phase 3 counts for the same categories.
 
   Verify every number in the file comes from the two `summary.json` files.
-- [ ] 8.3 Present the baseline to the maintainer for the gate thresholds in `gate.toml` (a core decision, not a `TODO(human)` in code) and record the chosen values and their reason in `docs/evals/v0-baseline.md`. Verify the reporter over the baseline runs applies them and reports the expected gate result: `v0` is expected to fail.
+- [x] 8.3 Present the baseline to the maintainer for the gate thresholds in `gate.toml` (a core decision, not a `TODO(human)` in code) and record the chosen values and their reason in `docs/evals/v0-baseline.md`. Verify the reporter over the baseline runs applies them and reports the expected gate result: `v0` is expected to fail.
 
 ## Workflow follow-up
 
