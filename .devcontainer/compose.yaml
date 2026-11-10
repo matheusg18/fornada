@@ -204,7 +204,7 @@ services:
 
   minio:
     # Chainguard's free tier only publishes `latest`, so it is pinned by digest.
-    image: cgr.dev/chainguard/minio:latest@sha256:3c60a2a8c4d33409a9bc7a623a7fcbfb4605adc3d89422d2f53b3f673a6e5597
+    image: cgr.dev/chainguard/minio:latest@sha256:fb893e36fc369d41e92f678b17ec27378fa5bf0576aeef7ac15460c13629ab5a
     restart: unless-stopped
     entrypoint: sh
     # Create the `langfuse` bucket before starting the server.
@@ -386,7 +386,7 @@ services:
     # Smoke test for the Collector: sends 5 synthetic traces (2 spans each) and
     # exits. Behind a profile, so it never starts with the dev environment. Run
     # it from the host (see AGENTS.md, "Dev environment").
-    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.164.1
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.165.1
     profiles: [smoke-test]
     depends_on:
       - edot-collector
